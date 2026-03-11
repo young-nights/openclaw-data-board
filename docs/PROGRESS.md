@@ -1,5 +1,30 @@
 # Progress
 
+## Phase 129 (Public brand lock-in + first icon asset) — Completed
+- Scope:
+  - Lock the public-facing project name to one clear, durable brand for GitHub and package metadata.
+  - Add a first reusable icon asset that matches the Apple-native visual direction already used by the product UI.
+- Changed files:
+  - `README.md`
+  - `package.json`
+  - `package-lock.json`
+  - `docs/assets/openclaw-control-center-icon.svg`
+  - `docs/assets/openclaw-control-center-icon.png`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Standardized the public project name to `OpenClaw Control Center`.
+  - Renamed the package metadata to `openclaw-control-center`.
+  - Added a vector icon master plus PNG preview export:
+    - rounded Apple-style tile
+    - control-ring motif
+    - three-claw central mark
+  - Updated README branding copy and top-of-file icon usage to match the new public name.
+- Verification:
+  - `npm run release:audit` passed.
+  - `npm run build` passed.
+  - `npm test` passed.
+  - `npm run smoke:ui` passed.
+
 ## Phase 128 (Standalone public-release workflow and audit gate) — Completed
 - Scope:
   - Convert open-source readiness from a one-off manual check into a repeatable local release workflow.

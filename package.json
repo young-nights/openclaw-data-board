@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-mission-control-mvp",
+  "name": "openclaw-control-center",
   "version": "0.1.0",
   "description": "Safety-first local control center for OpenClaw observability, task operations, and operator review.",
   "license": "MIT",
