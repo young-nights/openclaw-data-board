@@ -29,7 +29,7 @@ OpenClaw 的安全优先、本地优先控制中心。
 ## 截图
 以下截图来自一个本地 OpenClaw 环境：
 
-<img src="docs/assets/usage-en.png" alt="OpenClaw Control Center 用量截图" width="900" />
+<img src="docs/assets/usage-zh.png" alt="OpenClaw Control Center 中文用量截图" width="900" />
 
 ## 5 分钟启动
 ```bash

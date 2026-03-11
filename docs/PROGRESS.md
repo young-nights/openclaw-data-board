@@ -1,5 +1,22 @@
 # Progress
 
+## Phase 136 (README screenshots now match page language) — Completed
+- Scope:
+  - Make the public README screenshots language-consistent so Chinese copy uses Chinese screenshots and English copy uses English screenshots.
+- Changed files:
+  - `README.md`
+  - `docs/assets/usage-zh.png`
+  - `.gitignore`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Replaced the Chinese README usage screenshot reference from the English asset to a dedicated Chinese usage screenshot.
+  - Kept the English README on the English screenshot asset.
+  - Ignored local screenshot-candidate artifacts created while preparing the Chinese screenshot.
+- Verification:
+  - `npm run build`
+  - `npm test`
+  - `npm run smoke:ui`
+
 ## Phase 135 (English overview health ring no longer collides in README or UI) — Completed
 - Scope:
   - Fix the English `Health score` ring so the inner label does not crowd or visually collide with the score.
