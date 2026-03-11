@@ -1,5 +1,33 @@
 # Progress
 
+## Phase 132 (README now explains every primary product section) — Completed
+- Scope:
+  - Make the public README explain what each main control-center section actually does instead of only showing screenshots and setup steps.
+  - Keep the explanation operator-facing and useful for non-technical readers in both English and Chinese.
+- Changed files:
+  - `README.md`
+  - `README.zh-CN.md`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Added a full section-by-section tour to the English README:
+    - Overview
+    - Usage
+    - Staff
+    - Memory
+    - Documents
+    - Tasks
+    - Settings
+  - Added the matching Chinese section guide to `README.zh-CN.md`.
+  - Wrote each section in plain language around:
+    - what it shows
+    - why it matters
+    - when to use it
+- Verification:
+  - `npm run release:audit` passed.
+  - `npm run build` passed.
+  - `npm test` passed.
+  - `npm run smoke:ui` passed.
+
 ## Phase 131 (README hero switched from icon block to wide overview screenshot) — Completed
 - Scope:
   - Replace the weak-looking small icon block at the top of the public README with a product-led hero that immediately shows the real UI.

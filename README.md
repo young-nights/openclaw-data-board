@@ -45,6 +45,43 @@ Then open:
 - `http://127.0.0.1:4310/?section=overview&lang=en`
 - `http://127.0.0.1:4310/?section=overview&lang=zh`
 
+## Section-by-section tour
+
+### Overview
+- The main operating screen for non-technical users.
+- Shows the current control posture, key action items, runtime issues, stalled runs, budget risk, who is active, and what needs attention first.
+- Best when you want one fast answer to: “Is OpenClaw okay right now?”
+
+### Usage
+- Shows today, 7-day, and 30-day usage and spend trends.
+- Includes subscription windows, quota consumption, usage mix, and connector status.
+- Best when you want to know whether spend or quota is becoming risky.
+
+### Staff
+- Shows who is truly active now versus who only has queued work.
+- Separates live work from “next up” so backlog is not confused with active execution.
+- Best when you want to know who is busy, idle, blocked, or waiting.
+
+### Memory
+- A source-backed workbench for daily and long-term memory files.
+- Scoped to active OpenClaw agents from `openclaw.json`, so deleted agents do not keep showing up.
+- Best when you want to inspect or edit memory that the current OpenClaw team is actually using.
+
+### Documents
+- A source-backed workbench for shared and agent-specific core markdown docs.
+- Reads the real source files and writes back to the same files.
+- Best when you want to maintain the actual working documents behind the system.
+
+### Tasks
+- Combines task board, schedule, approvals, execution chains, and runtime evidence.
+- Helps distinguish mapped work from real execution evidence, and shows what is blocked or needs review.
+- Best when you want to understand what is being carried, what is only planned, and what needs intervention.
+
+### Settings
+- Shows safety mode, connector status, and data-link expectations.
+- Makes it clear what is connected, what is still partial, and which high-risk actions are intentionally disabled.
+- Best when you want to verify environment setup or explain why a signal is missing.
+
 For:
 - Existing OpenClaw users who want a local control center for observability, usage, staff activity, tasks, approvals, replay, and documents.
 - Teams running OpenClaw on the same machine or a reachable local environment.
