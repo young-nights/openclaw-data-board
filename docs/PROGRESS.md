@@ -1,5 +1,26 @@
 # Progress
 
+## Phase 130 (README language switch becomes real file-level localization) — Completed
+- Scope:
+  - Replace the fake in-page README language jump with a real English/Chinese file split for GitHub readers.
+  - Ensure clicking `中文` opens a fully Chinese page instead of only jumping to a later section in the same file.
+- Changed files:
+  - `README.md`
+  - `README.zh-CN.md`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Converted `README.md` into the English landing page only.
+  - Added a standalone `README.zh-CN.md` as the Chinese landing page.
+  - Replaced the old in-page anchor toggle with file-level language links:
+    - English README links to `README.zh-CN.md`
+    - Chinese README links back to `README.md`
+  - Removed the duplicated embedded Chinese onboarding block from the English README.
+- Verification:
+  - `npm run release:audit` passed.
+  - `npm run build` passed.
+  - `npm test` passed.
+  - `npm run smoke:ui` passed.
+
 ## Phase 129 (Public brand lock-in + first icon asset) — Completed
 - Scope:
   - Lock the public-facing project name to one clear, durable brand for GitHub and package metadata.

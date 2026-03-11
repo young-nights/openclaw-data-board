@@ -4,7 +4,7 @@
 
 Safety-first local control center for OpenClaw.
 
-Language / 语言: [English](#english-installation-and-onboarding) | [中文](#中文安装与上手)
+Language: **English** | [中文](README.zh-CN.md)
 
 ## Why this exists
 - One local place to see whether OpenClaw is healthy, busy, blocked, or drifting.
@@ -47,7 +47,7 @@ Then open:
 - `http://127.0.0.1:4310/?section=overview&lang=en`
 - `http://127.0.0.1:4310/?section=overview&lang=zh`
 
-For / 适用对象:
+For:
 - Existing OpenClaw users who want a local control center for observability, usage, staff activity, tasks, approvals, replay, and documents.
 - Teams running OpenClaw on the same machine or a reachable local environment.
 - Not a generic dashboard for non-OpenClaw agent stacks.
@@ -72,7 +72,7 @@ For / 适用对象:
 6. `npm run smoke:ui`
 7. `UI_MODE=true npm run dev`
 
-## English installation and onboarding
+## Installation and onboarding
 
 ### 1. Before you start
 You should already have:
@@ -187,122 +187,6 @@ On your first launch, check these pages in order:
 - Missing `Documents / Memory` agents usually means `OPENCLAW_HOME` points to the wrong OpenClaw root or `openclaw.json` is missing.
 - Missing usage/subscription data usually means `CODEX_HOME` or `OPENCLAW_SUBSCRIPTION_SNAPSHOT_PATH` needs to be set.
 - If you only want a safe read-only dashboard, do not change the mutation defaults.
-
-## 中文安装与上手
-
-### 1. 开始前准备
-你最好已经有：
-- 一个正常可用的 OpenClaw 安装
-- 一个可连通的 OpenClaw Gateway
-- 当前机器上的 `node` 和 `npm`
-- 对 OpenClaw 主目录的读取权限
-
-如果你希望 `用量 / 订阅` 这类信息更完整，当前机器最好还能读到：
-- `~/.openclaw`
-- `~/.codex`
-- 你的 OpenClaw 订阅快照文件，尤其是它不在默认位置时
-
-### 2. 安装项目
-```bash
-git clone <你的仓库地址>
-cd control-center
-npm install
-cp .env.example .env
-```
-
-### 3. 配置 `.env`
-第一次接入建议保持安全默认值，不要急着开写操作。
-
-可以先用这份基线配置：
-```dotenv
-GATEWAY_URL=ws://127.0.0.1:18789
-READONLY_MODE=true
-APPROVAL_ACTIONS_ENABLED=false
-APPROVAL_ACTIONS_DRY_RUN=true
-IMPORT_MUTATION_ENABLED=false
-IMPORT_MUTATION_DRY_RUN=false
-LOCAL_TOKEN_AUTH_REQUIRED=true
-UI_MODE=false
-UI_PORT=4310
-
-# 只有在你的路径不是默认值时才需要设置：
-# OPENCLAW_HOME=/path/to/.openclaw
-# CODEX_HOME=/path/to/.codex
-# OPENCLAW_SUBSCRIPTION_SNAPSHOT_PATH=/path/to/subscription.json
-```
-
-只有这些情况才需要改：
-- `GATEWAY_URL`：你的 OpenClaw Gateway 不在默认本地地址
-- `OPENCLAW_HOME`：你的 OpenClaw 目录不在 `~/.openclaw`
-- `CODEX_HOME`：你的 Codex 数据不在 `~/.codex`
-- `OPENCLAW_SUBSCRIPTION_SNAPSHOT_PATH`：你的订阅或账单快照文件放在自定义位置
-- `UI_PORT`：`4310` 端口已被占用
-
-### 4. 可选：让你自己的 OpenClaw 帮你配置
-如果你想让自己的 OpenClaw 帮你把环境接好，可以直接给它这段提示词：
-
-```text
-你现在要帮我把 OpenClaw Control Center 接到这台机器自己的 OpenClaw 环境上。
-
-只允许在 control-center 仓库里工作。
-除非我明确要求，否则不要修改应用源码。
-目标是完成一次安全的首次接入配置。
-
-请按下面步骤执行：
-1. 检查 OpenClaw Gateway 是否可达，并告诉我正确的 gateway URL。
-2. 确认这台机器上正确的 OpenClaw 主目录和 Codex 主目录。
-3. 对照 .env.example，创建或更新 .env。
-4. 第一次接入时必须保持这些值：
-   - READONLY_MODE=true
-   - LOCAL_TOKEN_AUTH_REQUIRED=true
-   - APPROVAL_ACTIONS_ENABLED=false
-   - IMPORT_MUTATION_ENABLED=false
-5. 不要开启 live import，也不要开启 approval mutation。
-6. 不要改 OpenClaw 自己的配置文件。
-7. 完成后输出：
-   - 你实际修改了哪些 env 值
-   - 我下一步应该执行的准确命令
-   - 我应该先打开哪些页面来确认接入成功
-8. 如果缺少必要的路径、进程或文件，不要猜，直接明确告诉我缺什么。
-```
-
-### 5. 验证安装
-执行：
-```bash
-npm run build
-npm test
-npm run smoke:ui
-```
-
-预期结果：
-- build 通过
-- test 通过
-- UI smoke 输出一个本地地址，比如 `http://127.0.0.1:<port>`
-
-### 6. 启动界面
-```bash
-UI_MODE=true npm run dev
-```
-
-然后打开：
-- 中文界面：`http://127.0.0.1:4310/?section=overview&lang=zh`
-- 英文界面：`http://127.0.0.1:4310/?section=overview&lang=en`
-
-如果你改了 `UI_PORT`，把上面的 `4310` 换成你自己的端口。
-
-### 7. 首次上手检查顺序
-第一次打开后，建议按这个顺序检查：
-1. `总览`：页面能正常打开，并且能看到当前系统状态。
-2. `用量`：能看到真实数字，或者至少能看到明确的“数据源未连接”状态。
-3. `员工`：实时工作状态和真实 active session 大致一致。
-4. `任务`：当前工作、待审批、执行链卡片都能正常加载，而且不会吐原始 payload。
-5. `文档` 和 `记忆`：看到的 agent 标签应该和你的 `openclaw.json` 活跃 agent 一致。
-
-### 8. 如果看起来不对
-- 实时活动全空，通常是 `GATEWAY_URL` 错了，或者 OpenClaw Gateway 没启动。
-- `文档 / 记忆` 的 agent 范围不对，通常是 `OPENCLAW_HOME` 指错了，或者 `openclaw.json` 不可读。
-- `用量 / 订阅` 没数据，通常是 `CODEX_HOME` 或 `OPENCLAW_SUBSCRIPTION_SNAPSHOT_PATH` 没配对。
-- 如果你只是想先安全观察，不要改动默认的只读和 mutation 开关。
 
 ## Local commands
 - `npm run build`
