@@ -1,5 +1,24 @@
 # Progress
 
+## Phase 139 (README now highlights token attribution instead of the overview ring) — Completed
+- Scope:
+  - Replace the less informative left-hand README screenshot with a token-attribution pie chart view.
+  - Keep the staff page as the second representative screenshot and give the attribution screenshot slightly more width.
+- Changed files:
+  - `README.md`
+  - `README.en.md`
+  - `docs/assets/token-share-zh.png`
+  - `docs/assets/token-share-en.png`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Captured localized `Timed-job usage share` / `定时任务用量占比` screenshot assets that include the pie chart and attribution list.
+  - Replaced the old overview-ring slot in both READMEs with the new token-attribution asset.
+  - Rebalanced the screenshot table widths to `56% / 44%` so the attribution graphic has enough room to read.
+- Verification:
+  - `npm run build`
+  - `npm test`
+  - `npm run smoke:ui`
+
 ## Phase 138 (README screenshot set now highlights the control ring and staff page) — Completed
 - Scope:
   - Replace the less distinctive README screenshot block with the two most representative surfaces: the control ring posture card and the staff page.

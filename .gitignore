@@ -23,9 +23,13 @@ docs/mission.sop.md
 init.sh
 docs/assets/*-tight.png
 docs/assets/*-candidate.png
+docs/assets/*-candidate2.png
+docs/assets/*-candidate3.png
+docs/assets/*-candidate4.png
 docs/assets/*-preview*.png
 docs/assets/*-inspect*.png
 docs/assets/_wk-*.png
+docs/assets/_usage-*.png
 1440m
 180m
 720m

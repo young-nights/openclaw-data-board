@@ -31,15 +31,15 @@ Example UI from a local OpenClaw environment:
 
 <table>
   <tr>
-    <td width="50%">
-      <img src="docs/assets/overview-focus-en.png" alt="OpenClaw Control Center overview control posture ring screenshot" width="100%" />
+    <td width="56%">
+      <img src="docs/assets/token-share-en.png" alt="OpenClaw Control Center token attribution screenshot" width="100%" />
     </td>
-    <td width="50%">
+    <td width="44%">
       <img src="docs/assets/staff-en.png" alt="OpenClaw Control Center staff page screenshot" width="100%" />
     </td>
   </tr>
   <tr>
-    <td><strong>Control ring</strong><br />See health, operating posture, and budget risk in one glance.</td>
+    <td><strong>Token attribution</strong><br />See which timed jobs are actually consuming tokens and how the share splits across them.</td>
     <td><strong>Staff page</strong><br />See who is working now, who is on standby, recent output, and schedule state.</td>
   </tr>
 </table>

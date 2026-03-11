@@ -31,15 +31,15 @@ OpenClaw 的安全优先、本地优先控制中心。
 
 <table>
   <tr>
-    <td width="50%">
-      <img src="docs/assets/overview-focus-zh.png" alt="OpenClaw Control Center 中文总控圆环截图" width="100%" />
+    <td width="56%">
+      <img src="docs/assets/token-share-zh.png" alt="OpenClaw Control Center 中文 token 消耗归因截图" width="100%" />
     </td>
-    <td width="50%">
+    <td width="44%">
       <img src="docs/assets/staff-zh.png" alt="OpenClaw Control Center 中文员工页截图" width="100%" />
     </td>
   </tr>
   <tr>
-    <td><strong>总控圆环</strong><br />一眼看健康分、推进状态和预算风险。</td>
+    <td><strong>Token 消耗归因</strong><br />直接看定时任务 token 是被哪些任务吃掉的，占比一眼可见。</td>
     <td><strong>员工页</strong><br />直接看谁在工作、谁待命、最近产出和排班状态。</td>
   </tr>
 </table>
