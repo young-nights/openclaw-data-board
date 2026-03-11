@@ -1,5 +1,43 @@
 # Progress
 
+## Phase 134 (GitHub README now defaults to Chinese, with English as an explicit switch) — Completed
+- Scope:
+  - Make the public GitHub landing page default to Chinese instead of English.
+  - Keep English available as a first-class alternate README, not a page anchor trick.
+- Changed files:
+  - `README.md`
+  - `README.en.md`
+  - `README.zh-CN.md`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Promoted the Chinese README content into `README.md` so GitHub now lands on Chinese by default.
+  - Created `README.en.md` as the standalone English landing page.
+  - Updated the language links so Chinese opens the default README and English opens the dedicated English file.
+- Verification:
+  - `npm run release:audit`
+  - `npm run build`
+  - `npm test`
+  - `npm run smoke:ui`
+
+## Phase 133 (README hero screenshots tightened to remove floaty outer whitespace) — Completed
+- Scope:
+  - Fix the public README hero screenshots that looked washed out and “floating” on GitHub because too much outer whitespace from the browser page was included.
+  - Keep the same overview-first hero concept, but crop it tighter to the actual product surface.
+- Changed files:
+  - `docs/assets/overview-hero-en.png`
+  - `docs/assets/overview-hero-zh.png`
+  - `.gitignore`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Replaced both README hero screenshots with tighter crops that remove the large outer page margins.
+  - Kept the wide landscape aspect ratio while making the control-center surface fill the frame more naturally.
+  - Ignored temporary `*-tight.png` local crop artifacts so they do not pollute repo status.
+- Verification:
+  - `npm run release:audit` passed.
+  - `npm run build` passed.
+  - `npm test` passed.
+  - `npm run smoke:ui` passed.
+
 ## Phase 132 (README now explains every primary product section) — Completed
 - Scope:
   - Make the public README explain what each main control-center section actually does instead of only showing screenshots and setup steps.
