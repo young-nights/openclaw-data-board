@@ -1,5 +1,26 @@
 # Progress
 
+## Phase 151 (Route-latency optimization without UI changes) — Completed
+- Scope:
+  - Reduce slow first-navigation and post-cache-expiry stalls without changing page structure, copy, or data surfaces.
+- Changed files:
+  - `src/runtime/usage-cost.ts`
+  - `src/ui/server.ts`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Parallelized runtime usage scanning across agents and session files so full usage snapshots no longer block on a long sequential `.jsonl` walk.
+  - Switched heavy UI caches to stale-while-refresh behavior for live sessions, replay preview, and usage snapshots so expired caches refresh in the background instead of freezing section switches.
+  - Kept the same full usage truth path and the same rendered surfaces; the optimization is request-path and cache behavior only.
+- Verification:
+  - `npm run build`
+  - `npm test`
+  - `npm run smoke:ui`
+  - Local route timing after restart:
+    - `overview` first open: about `3.67s` -> about `0.75s`
+    - `usage-cost` first open: about `0.62s` -> about `0.29s`
+    - `projects-tasks` after cache expiry: about `3.44s` -> about `0.28s`
+    - after `12s` idle: `overview ~0.73s`, `usage ~0.79s`, `tasks ~0.28s`
+
 ## Phase 150 (Tracked runtime source restored to the public repo) — Completed
 - Scope:
   - Fix the public repository so fresh clones include the full `src/runtime` source tree.

@@ -143,6 +143,7 @@ const HTML_HEAVY_CACHE_TTL_MS = 3_000;
 const HTML_USAGE_CACHE_TTL_MS = 10_000;
 const HTML_SNAPSHOT_CACHE_TTL_MS = 10_000;
 const HTML_LIVE_SESSIONS_CACHE_TTL_MS = POLLING_INTERVALS_MS.sessionsList;
+const HTML_REPLAY_CACHE_TTL_MS = 10_000;
 const JSON_MAX_BYTES = 128 * 1024;
 const FORM_MAX_BYTES = 16 * 1024;
 const EDITABLE_TEXT_FILE_MAX_BYTES = 1024 * 1024;
@@ -446,6 +447,12 @@ let renderUsageCostFullCache:
 let renderOfficePresenceCache:
   | { expiresAt: number; value: OfficeSessionPresenceSnapshot }
   | undefined;
+let renderReplayPreviewCache:
+  | {
+      value: Awaited<ReturnType<typeof loadReplayIndex>>;
+      expiresAt: number;
+    }
+  | undefined;
 let renderStaffRecentActivityCache:
   | {
       snapshotAt: string;
@@ -496,6 +503,7 @@ let renderLiveSessionsCache:
     }
   | undefined;
 let renderLiveSessionsInFlight: Promise<Awaited<ReturnType<ToolClient["sessionsList"]>>> | undefined;
+let renderReplayPreviewInFlight: Promise<Awaited<ReturnType<typeof loadReplayIndex>>> | undefined;
 
 type GlobalVisibilityTaskStatus = "done" | "not_done";
 
@@ -1778,6 +1786,23 @@ async function loadCachedLiveSessions(
   if (renderLiveSessionsCache && renderLiveSessionsCache.expiresAt > now) {
     return renderLiveSessionsCache.value;
   }
+  if (renderLiveSessionsCache) {
+    if (!renderLiveSessionsInFlight) {
+      const nextValue = toolClient.sessionsList();
+      renderLiveSessionsInFlight = nextValue;
+      void nextValue
+        .then((value) => {
+          renderLiveSessionsCache = {
+            value,
+            expiresAt: Date.now() + HTML_LIVE_SESSIONS_CACHE_TTL_MS,
+          };
+        })
+        .finally(() => {
+          renderLiveSessionsInFlight = undefined;
+        });
+    }
+    return renderLiveSessionsCache.value;
+  }
   if (renderLiveSessionsInFlight) {
     return renderLiveSessionsInFlight;
   }
@@ -1867,7 +1892,7 @@ async function readReadModelSnapshotWithLiveSessions(toolClient: ToolClient): Pr
 async function primeUiRenderCaches(toolClient: ToolClient): Promise<void> {
   try {
     const snapshot = await readReadModelSnapshotWithLiveSessions(toolClient);
-    await Promise.all([loadCachedUsageCost(snapshot, "full"), loadCachedOfficeSessionPresence()]);
+    await Promise.all([loadCachedUsageCost(snapshot, "full"), loadCachedOfficeSessionPresence(), loadCachedReplayPreview()]);
   } catch (error) {
     console.warn("[mission-control] ui cache warmup failed", {
       error: error instanceof Error ? error.message : String(error),
@@ -3387,6 +3412,45 @@ async function loadCachedUsageCost(
   ) {
     return targetCache.value;
   }
+  if (targetCache && targetCache.snapshotKey === snapshotKey) {
+    if (!targetInFlight || targetInFlight.snapshotKey !== snapshotKey) {
+      const nextValue = buildUsageCostSnapshot(snapshot, mode);
+      if (mode === "full") {
+        renderUsageCostFullInFlight = {
+          snapshotKey,
+          value: nextValue,
+        };
+      } else {
+        renderUsageCostSummaryInFlight = {
+          snapshotKey,
+          value: nextValue,
+        };
+      }
+      void nextValue
+        .then((value) => {
+          const nextCache = {
+            snapshotKey,
+            value,
+            expiresAt: Date.now() + HTML_USAGE_CACHE_TTL_MS,
+          };
+          if (mode === "full") {
+            renderUsageCostFullCache = nextCache;
+          } else {
+            renderUsageCostSummaryCache = nextCache;
+          }
+        })
+        .finally(() => {
+          if (mode === "full") {
+            if (renderUsageCostFullInFlight?.snapshotKey === snapshotKey) {
+              renderUsageCostFullInFlight = undefined;
+            }
+          } else if (renderUsageCostSummaryInFlight?.snapshotKey === snapshotKey) {
+            renderUsageCostSummaryInFlight = undefined;
+          }
+        });
+    }
+    return targetCache.value;
+  }
   if (targetInFlight?.snapshotKey === snapshotKey) {
     return targetInFlight.value;
   }
@@ -3432,12 +3496,63 @@ async function loadCachedOfficeSessionPresence(): Promise<OfficeSessionPresenceS
   if (renderOfficePresenceCache && renderOfficePresenceCache.expiresAt > now) {
     return renderOfficePresenceCache.value;
   }
+  if (renderOfficePresenceCache) {
+    return renderOfficePresenceCache.value;
+  }
   const value = await loadBestEffortOfficeSessionPresence();
   renderOfficePresenceCache = {
     value,
     expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
   };
   return value;
+}
+
+async function loadCachedReplayPreview(): Promise<Awaited<ReturnType<typeof loadReplayIndex>>> {
+  const now = Date.now();
+  if (renderReplayPreviewCache && renderReplayPreviewCache.expiresAt > now) {
+    return renderReplayPreviewCache.value;
+  }
+  if (renderReplayPreviewCache) {
+    if (!renderReplayPreviewInFlight) {
+      const nextValue = loadReplayIndex({
+        timelineLimit: 20,
+        digestLimit: 10,
+        exportLimit: 10,
+      });
+      renderReplayPreviewInFlight = nextValue;
+      void nextValue
+        .then((value) => {
+          renderReplayPreviewCache = {
+            value,
+            expiresAt: Date.now() + HTML_REPLAY_CACHE_TTL_MS,
+          };
+        })
+        .finally(() => {
+          renderReplayPreviewInFlight = undefined;
+        });
+    }
+    return renderReplayPreviewCache.value;
+  }
+  if (renderReplayPreviewInFlight) {
+    return renderReplayPreviewInFlight;
+  }
+
+  const nextValue = loadReplayIndex({
+    timelineLimit: 20,
+    digestLimit: 10,
+    exportLimit: 10,
+  });
+  renderReplayPreviewInFlight = nextValue;
+  try {
+    const value = await nextValue;
+    renderReplayPreviewCache = {
+      value,
+      expiresAt: Date.now() + HTML_REPLAY_CACHE_TTL_MS,
+    };
+    return value;
+  } finally {
+    renderReplayPreviewInFlight = undefined;
+  }
 }
 
 async function renderHtml(
@@ -3513,11 +3628,7 @@ async function renderHtml(
   const [cronOverview, openclawCronJobs, replayPreview, usageCost, officeRoster, officePresence] = await Promise.all([
     buildCronOverview(snapshot, POLLING_INTERVALS_MS.cron),
     loadOpenclawCronCatalog(options.language),
-    loadReplayIndex({
-      timelineLimit: 20,
-      digestLimit: 10,
-      exportLimit: 10,
-    }),
+    loadCachedReplayPreview(),
     loadCachedUsageCost(snapshot, usageCostMode),
     loadBestEffortAgentRoster(),
     loadCachedOfficeSessionPresence(),

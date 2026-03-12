@@ -35,6 +35,7 @@ const CONTEXT_CRITICAL_RATIO = 0.9;
 const BUDGET_WARN_RATIO = 0.8;
 const RUNTIME_USAGE_LOOKBACK_DAYS = 62;
 const USAGE_SOURCE_CACHE_TTL_MS = 10_000;
+const RUNTIME_USAGE_SCAN_CONCURRENCY = 8;
 
 type ConnectionStatus = "connected" | "partial" | "not_connected";
 type SubscriptionReasonCode =
@@ -256,6 +257,23 @@ async function loadSourceWithCache<T>(
 ): Promise<T> {
   const now = Date.now();
   if (cache && cache.expiresAt > now) return cache.value;
+  if (cache) {
+    if (!inFlight) {
+      const nextValue = loader();
+      assignInFlight(nextValue);
+      void nextValue
+        .then((value) => {
+          assignCache({
+            value,
+            expiresAt: Date.now() + USAGE_SOURCE_CACHE_TTL_MS,
+          });
+        })
+        .finally(() => {
+          assignInFlight(undefined);
+        });
+    }
+    return cache.value;
+  }
   if (inFlight) return inFlight;
 
   const nextValue = loader();
@@ -664,23 +682,32 @@ async function loadRuntimeUsageData(): Promise<RuntimeUsageData> {
   let hasSessionStore = false;
   let hadParseError = false;
 
-  for (const agent of agentDirs) {
+  const perAgentContexts = await mapWithConcurrency(agentDirs, RUNTIME_USAGE_SCAN_CONCURRENCY, async (agent) => {
     const sessionsDir = join(agent.path, "sessions");
-
     const contextResult = await loadRuntimeSessionContextsForAgent(agent.name, sessionsDir);
-    hasSessionStore = hasSessionStore || contextResult.foundStore;
-    hadParseError = hadParseError || contextResult.hadError;
-    for (const context of contextResult.contexts) {
+    return { agent, sessionsDir, contextResult };
+  });
+
+  for (const item of perAgentContexts) {
+    hasSessionStore = hasSessionStore || item.contextResult.foundStore;
+    hadParseError = hadParseError || item.contextResult.hadError;
+    for (const context of item.contextResult.contexts) {
       out.sessionContexts.push(context);
       if (context.sessionId) sessionById.set(context.sessionId, context);
     }
+  }
 
+  const perAgentEvents = await mapWithConcurrency(perAgentContexts, RUNTIME_USAGE_SCAN_CONCURRENCY, async (item) => {
     const eventResult = await loadRuntimeUsageEventsForAgent(
-      agent.name,
-      sessionsDir,
+      item.agent.name,
+      item.sessionsDir,
       lookbackLowerBoundMs,
       sessionById,
     );
+    return eventResult;
+  });
+
+  for (const eventResult of perAgentEvents) {
     hasSessionStore = hasSessionStore || eventResult.foundStore;
     hadParseError = hadParseError || eventResult.hadError;
     out.events.push(...eventResult.events);
@@ -780,16 +807,16 @@ async function loadRuntimeUsageEventsForAgent(
 
   let hadError = false;
 
-  for (const fileName of sessionFiles) {
+  const parsedFiles = await mapWithConcurrency(sessionFiles, RUNTIME_USAGE_SCAN_CONCURRENCY, async (fileName) => {
     const filePath = join(sessionsDir, fileName);
-
     try {
       const fileStat = await stat(filePath);
-      if (fileStat.mtimeMs < lookbackLowerBoundMs) continue;
+      if (fileStat.mtimeMs < lookbackLowerBoundMs) return { events: [] as RuntimeUsageEvent[], hadError: false };
 
       const raw = await readFile(filePath, "utf8");
       const lines = raw.replace(/\r/g, "").split("\n");
       let sessionId = fileName.slice(0, -".jsonl".length);
+      const fileEvents: RuntimeUsageEvent[] = [];
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -825,7 +852,7 @@ async function loadRuntimeUsageEventsForAgent(
         const provider = asString(message.provider) ?? context?.provider ?? inferProvider(model);
 
         const timestamp = new Date(timestampMs).toISOString();
-        events.push({
+        fileEvents.push({
           timestamp,
           day: timestamp.slice(0, 10),
           sessionId,
@@ -837,9 +864,17 @@ async function loadRuntimeUsageEventsForAgent(
           cost: asNumber(usageCost?.total),
         });
       }
-    } catch {
-      hadError = true;
+
+      return { events: fileEvents, hadError: false };
+    } catch (error) {
+      if (isFsNotFound(error)) return { events: [] as RuntimeUsageEvent[], hadError: false };
+      return { events: [] as RuntimeUsageEvent[], hadError: true };
     }
+  });
+
+  for (const item of parsedFiles) {
+    hadError = hadError || item.hadError;
+    events.push(...item.events);
   }
 
   return {
@@ -1026,6 +1061,28 @@ function aggregateRuntimeUsageWindow(events: RuntimeUsageEvent[]): {
     requests: events.length,
     daysCovered: days.size,
   };
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => worker()));
+  return results;
 }
 
 function buildRuntimeDailyCostMap(events: RuntimeUsageEvent[]): Map<string, number> {
