@@ -1,5 +1,22 @@
 # Progress
 
+## Phase 146 (README install prompt hardened for mixed OpenClaw environments) — Completed
+- Scope:
+  - Make the public install mega prompt more robust across different OpenClaw environments, provider models, and machine setups.
+  - Keep the control-center setup path strict about safe defaults while distinguishing hard blockers from allowed degraded installs.
+- Changed files:
+  - `README.md`
+  - `README.en.md`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Expanded the README setup prompt to cover provider API-key/OpenRouter/Anthropic-style environments in addition to Codex/GPT subscription-backed ones.
+  - Added explicit checks for `node`, `npm`, repo write access, npm-registry reachability, multiple candidate OpenClaw homes, and multiple Gateway candidates.
+  - Made the prompt forbid fabricating provider secrets and require reporting upstream OpenClaw/provider prerequisites separately from control-center install success.
+  - Clarified which missing inputs are hard blockers versus degraded-but-acceptable control-center installs.
+- Verification:
+  - `npm run build`
+  - `npm run release:audit`
+
 ## Phase 144 (README visuals sanitized for public promotion) — Completed
 - Scope:
   - Remove real operational content from the public README visuals before promotion.
