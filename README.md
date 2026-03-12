@@ -131,6 +131,10 @@ cp .env.example .env
 ### 3. 默认推荐：让你自己的 OpenClaw 直接完成安装与接线
 最推荐的接入方式，不是你手动一项项配，而是直接把下面这段 mega prompt 交给你自己的 OpenClaw。
 
+如果你想直接复制独立文件，用这个：
+- [INSTALL_PROMPT.md](INSTALL_PROMPT.md)
+- [INSTALL_PROMPT.en.md](INSTALL_PROMPT.en.md)
+
 它应该一次性帮你做完这些事：
 - 检查本机 OpenClaw / Gateway / 路径
 - 安装依赖

@@ -145,6 +145,10 @@ cp .env.example .env
 ### 3. Recommended default: let your own OpenClaw do the install and setup
 The best first-run path is not manual setup. The best path is to give your own OpenClaw one installation prompt and let it do the safe wiring for you.
 
+If you want a copy-ready standalone file, use:
+- [INSTALL_PROMPT.en.md](INSTALL_PROMPT.en.md)
+- [INSTALL_PROMPT.md](INSTALL_PROMPT.md)
+
 It should handle:
 - environment checks
 - dependency install

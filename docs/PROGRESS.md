@@ -1,5 +1,23 @@
 # Progress
 
+## Phase 147 (Standalone install prompt files added) — Completed
+- Scope:
+  - Make the public install prompt easier to copy without forcing users to extract it from the README.
+  - Keep Chinese as the default public path while preserving a matching English version.
+- Changed files:
+  - `INSTALL_PROMPT.md`
+  - `INSTALL_PROMPT.en.md`
+  - `README.md`
+  - `README.en.md`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Added standalone install prompt files in Chinese and English.
+  - Linked both README files to the standalone prompt files right before the embedded mega prompt.
+  - Kept the same environment-coverage rules, safety defaults, and handoff format in the extracted files.
+- Verification:
+  - `npm run build`
+  - `npm run release:audit`
+
 ## Phase 146 (README install prompt hardened for mixed OpenClaw environments) — Completed
 - Scope:
   - Make the public install mega prompt more robust across different OpenClaw environments, provider models, and machine setups.
