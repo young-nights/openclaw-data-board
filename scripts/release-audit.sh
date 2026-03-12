@@ -47,6 +47,8 @@ check_exists "LICENSE"
 check_exists ".gitignore"
 check_exists ".env.example"
 check_exists "package.json"
+check_exists "src/ui/server.ts"
+check_exists "src/runtime/usage-cost.ts"
 
 check_no_match "absolute macOS home paths" '/Users/[^/]+/'
 check_no_match "absolute Linux home paths" '/home/[^/]+/'
@@ -64,6 +66,16 @@ if [ -d ".git" ]; then
     exit 1
   fi
   rm -f /tmp/release-audit-match.txt
+
+  if ! git ls-files --error-unmatch src/ui/server.ts >/dev/null 2>&1; then
+    echo "release-audit: missing tracked source file: src/ui/server.ts" >&2
+    exit 1
+  fi
+
+  if ! git ls-files --error-unmatch src/runtime/usage-cost.ts >/dev/null 2>&1; then
+    echo "release-audit: missing tracked source file: src/runtime/usage-cost.ts" >&2
+    exit 1
+  fi
 fi
 
 echo "release-audit: passed"

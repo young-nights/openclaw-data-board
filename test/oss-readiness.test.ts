@@ -27,7 +27,7 @@ test("repo includes baseline open-source release metadata", () => {
   const ignore = readFileSync(path.join(ROOT, ".gitignore"), "utf8");
   assert.match(ignore, /(^|\n)node_modules\/(\n|$)/);
   assert.match(ignore, /(^|\n)dist\/(\n|$)/);
-  assert.match(ignore, /(^|\n)runtime\/(\n|$)/);
+  assert.match(ignore, /(^|\n)\/?runtime\/(\n|$)/);
 
   const license = readFileSync(path.join(ROOT, "LICENSE"), "utf8");
   assert.match(license, /MIT License/);
@@ -65,4 +65,19 @@ test("gateway URL can be overridden from env for non-local installations", () =>
   ).trim();
 
   assert.equal(output, "ws://example.invalid:9999");
+});
+
+test("core source directories are present and tracked in git", () => {
+  assert(existsSync(path.join(ROOT, "src", "ui", "server.ts")), "Expected src/ui/server.ts to exist.");
+  assert(existsSync(path.join(ROOT, "src", "runtime", "usage-cost.ts")), "Expected src/runtime/usage-cost.ts to exist.");
+
+  const tracked = execFileSync("git", ["ls-files", "src/ui/server.ts", "src/runtime/usage-cost.ts"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean);
+
+  assert.deepEqual(tracked.sort(), ["src/runtime/usage-cost.ts", "src/ui/server.ts"]);
 });

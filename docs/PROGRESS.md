@@ -1,5 +1,25 @@
 # Progress
 
+## Phase 150 (Tracked runtime source restored to the public repo) — Completed
+- Scope:
+  - Fix the public repository so fresh clones include the full `src/runtime` source tree.
+  - Prevent future releases from passing when a core source directory exists locally but is missing from Git history.
+- Changed files:
+  - `.gitignore`
+  - `src/runtime/*`
+  - `scripts/release-audit.sh`
+  - `test/oss-readiness.test.ts`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Added the full `src/runtime` source tree to version control after confirming it had been left untracked.
+  - Kept `.gitignore` anchored to the root `runtime/` data directory so public source files under `src/runtime/` remain trackable.
+  - Hardened `release-audit` and `oss-readiness` checks to fail if `src/ui/server.ts` or `src/runtime/usage-cost.ts` are missing from Git.
+- Verification:
+  - `npm run build`
+  - `npm test`
+  - `npm run smoke:ui`
+  - `npm run release:audit`
+
 ## Phase 149 (Repo completeness checks added to install docs) — Completed
 - Scope:
   - Prevent install agents from misdiagnosing the repo as incomplete when they are in the wrong directory or a bad checkout.
