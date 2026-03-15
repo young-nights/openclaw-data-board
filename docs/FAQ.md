@@ -39,7 +39,7 @@
    - **名字/emoji** → 常见做法是放在 `IDENTITY.md`
    - **状态（执行中/空闲）** → 主要来自 Gateway 的 session 运行信号
    - **workspace** → 通常来自 agent 配置中的 `workspace` 字段
-   - **具体职责描述** → 更适合作为文档线索保存在 `IDENTITY.md`、`SOUL.md`、`AGENTS.md`
+   - **具体职责描述** → 当前不会自动把 `SOUL.md` 摘要直接显示成员工卡片文案，更适合作为文档线索保存在 `IDENTITY.md`、`SOUL.md`、`AGENTS.md`
 
 > **最佳实践：** 如果你希望控制中心更容易展示身份与职责线索，建议优先把简短身份说明写进 `IDENTITY.md`，并把详细角色说明写进 `SOUL.md` / `AGENTS.md`。
 
@@ -62,6 +62,25 @@ OpenClaw Gateway → 记录每次 API 调用的 token 用量
 **限额设置方式（最佳实践）：**
 
 预算/限额通常在你的 OpenClaw 配置里设置，而不是在控制中心 UI 里直接填写。具体字段名和写法，请以你当前使用的 OpenClaw 版本与官方文档为准。
+
+下面这段可以作为**常见示例**理解，不要把它当成所有环境都完全一致的唯一标准：
+
+```yaml
+# 常见示例：在 OpenClaw 配置中设置 budget
+# 具体字段请以你的 OpenClaw 版本为准
+
+budget:
+  # Token 限额
+  tokensIn: 1000000
+  tokensOut: 500000
+  totalTokens: 1500000
+
+  # 费用限额（美元）
+  cost: 50.00
+
+  # 预警比例（达到此比例时发出警告）
+  warnRatio: 0.8
+```
 
 **控制中心显示的内容：**
 - **用量页 → Token 消耗：** 按 agent、按模型、按时间段的 token 使用
@@ -113,6 +132,8 @@ openclaw sessions history <session-key> --limit 5
   ```
 - 如果仍无进展，再考虑终止或重启对应 session
 
+> **最佳实践：** 把这套流程理解成控制中心视角下的排查建议更合适，不要把它当成所有 OpenClaw 环境都完全一致的唯一底层判定标准。
+
 ---
 
 ## English Version
@@ -133,8 +154,16 @@ openclaw sessions history <session-key> --limit 5
 
 **Setting limits:** A common best practice is to configure budget thresholds in your OpenClaw config. The exact field names depend on your OpenClaw version and setup.
 
+The example below is a common pattern, not a universal schema for every environment:
+```yaml
+budget:
+  totalTokens: 1500000
+  cost: 50.00
+  warnRatio: 0.8
+```
+
 ### 3. Session Stall Detection — How Does It Work?
 
 A session is usually treated as "stalled" when the Control Center still sees it as running but recent activity signals stop updating for a while. Use `openclaw sessions list --filter running` to review candidates.
 
-Best-practice next step: inspect recent session activity first, then optionally send a message to the session (`openclaw sessions send <key> "continue"`). If it still does not recover, terminate or restart the session.
+Best-practice next step: inspect recent session activity first, then optionally send a message to the session (`openclaw sessions send <key> "continue"`). If it still does not recover, terminate or restart the session. Treat this as operator guidance from the Control Center perspective, not as the only possible OpenClaw runtime rule.
