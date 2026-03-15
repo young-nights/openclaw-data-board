@@ -18,10 +18,12 @@ Language: **English** | [中文](README.md)
 - `Overview`: health, current state, decisions waiting, and operator-facing summaries
 - `Usage`: usage, spend, subscription windows, and connector status
 - `Staff`: who is really working now versus only queued
+- `Collaboration`: parent-child relays and cross-session messages between existing agent sessions
 - `Tasks`: current work, approvals, execution chains, and runtime evidence
 - `Documents` and `Memory`: source-backed workbenches scoped to active OpenClaw agents
 
 ## What this release adds
+- `Collaboration`: a new standalone collaboration page so you can see both parent-child handoffs and verified cross-session agent communication such as `Main ⇄ Pandas`, instead of inferring everything from execution chains.
 - `Settings`: a new `Connection health` card that tells you what is already wired, what is still partial, and where to finish setup.
 - `Settings`: a new `Security risk summary` that translates current risk, impact, and next-step guidance into plain operator-facing language.
 - `Settings`: a new `Update status` card for current version, latest version, update channel, and install method.
@@ -48,6 +50,21 @@ Example UI from a local OpenClaw environment:
   <tr>
     <td><strong>Token attribution</strong><br />See which timed jobs are actually consuming tokens and how the share splits across them.</td>
     <td><strong>Staff page</strong><br />See who is working now, who is on standby, recent output, and schedule state.</td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td width="56%">
+      <img src="docs/assets/collaboration-en.png" alt="OpenClaw Control Center collaboration screenshot" width="100%" />
+    </td>
+    <td width="44%">
+      <img src="docs/assets/settings-insights-en.png" alt="OpenClaw Control Center security and update status screenshot" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Collaboration page</strong><br />See parent-child relays and verified cross-session communication such as <code>Main ⇄ Pandas</code> in one place.</td>
+    <td><strong>Security and update status</strong><br />See current risk, impact, next-step guidance, and the gap between your current and latest version.</td>
   </tr>
 </table>
 
@@ -85,6 +102,11 @@ Notes:
 - Shows who is truly active now versus who only has queued work.
 - Separates live work from “next up” so backlog is not confused with active execution.
 - Best when you want to know who is busy, idle, blocked, or waiting.
+
+### Collaboration
+- Shows how work moves between agents: who accepted it first, who handed it off, and which session is holding the next move.
+- Covers both parent-child session relays and verified cross-session communication such as `sessions_send` / `inter-session message`.
+- Best when you want to understand “who passed this to whom, and where is the collaboration waiting now?”
 
 ### Memory
 - A source-backed workbench for daily and long-term memory files.
