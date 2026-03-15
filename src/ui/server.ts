@@ -106,6 +106,7 @@ import {
   type SessionConversationFilters,
   type SessionConversationListItem,
   type SessionHistoryMessage,
+  type SessionInterSessionSignal,
 } from "../runtime/session-conversations";
 import { loadBestEffortAgentRoster, type AgentRosterEntry, type AgentRosterSnapshot } from "../runtime/agent-roster";
 import {
@@ -215,6 +216,7 @@ const DASHBOARD_SECTIONS = [
   "overview",
   "calendar",
   "team",
+  "collaboration",
   "memory",
   "docs",
   "usage-cost",
@@ -315,6 +317,7 @@ const DASHBOARD_SECTION_LINKS_EN: DashboardSectionLink[] = [
   { key: "overview", label: "Overview", blurb: "Today at a glance" },
   { key: "usage-cost", label: "Usage", blurb: "Budget and quota" },
   { key: "team", label: "Staff", blurb: "Mission, staff and assignments" },
+  { key: "collaboration", label: "Collaboration", blurb: "Agent handoffs and teamwork" },
   { key: "memory", label: "Memory", blurb: "Daily and long-term memories" },
   { key: "docs", label: "Documents", blurb: "Main and active agent core docs" },
   { key: "projects-tasks", label: "Tasks", blurb: "Board, schedule and activity" },
@@ -526,6 +529,9 @@ interface EditableAgentScope {
 type EditableAgentScopeConfigStatus = "configured" | "config_missing" | "config_invalid";
 
 let renderSessionPreviewCache:
+  | { snapshotAt: string; value: SessionConversationListResult; expiresAt: number }
+  | undefined;
+let renderCollaborationPreviewCache:
   | { snapshotAt: string; value: SessionConversationListResult; expiresAt: number }
   | undefined;
 let renderUsageCostSummaryCache:
@@ -743,6 +749,63 @@ interface TaskExecutionChainCard {
   sessionHref: string;
   taskHref?: string;
   unmapped?: boolean;
+}
+
+type CollaborationThreadStatus = "active" | "handoff" | "blocked" | "completed";
+type CollaborationThreadKind = "parent_child" | "inter_session";
+
+interface CollaborationParticipant {
+  agentId: string;
+  label: string;
+  identity: AgentAnimalIdentity;
+  current: boolean;
+  roleLabel: string;
+}
+
+interface CollaborationThreadAggregateItem {
+  sessionKey: string;
+  sessionHref: string;
+  latestAt?: string;
+}
+
+interface CollaborationTimelineStep {
+  id: string;
+  agentId: string;
+  roleLabel?: string;
+  title: string;
+  detail: string;
+  at?: string;
+  tone: "ok" | "info" | "warn" | "blocked";
+}
+
+interface CollaborationThreadCard {
+  id: string;
+  kind: CollaborationThreadKind;
+  sessionKey: string;
+  taskTitle: string;
+  routeTitle: string;
+  summary: string;
+  status: CollaborationThreadStatus;
+  statusBadge: string;
+  kindBadge: string;
+  currentOwnerLabel: string;
+  currentOwnerAgentId?: string;
+  currentOwnerRole: "parent" | "child" | "source" | "target";
+  latestAt?: string;
+  latestAtLabel: string;
+  participants: CollaborationParticipant[];
+  routeJoiner: "→" | "⇄";
+  multiAgent: boolean;
+  mainDispatched: boolean;
+  aggregateCount: number;
+  aggregateItems: CollaborationThreadAggregateItem[];
+  taskHref?: string;
+  sessionHref: string;
+  timeline: CollaborationTimelineStep[];
+  latestSnippet: string;
+  sourceLabel: string;
+  parentSessionKey?: string;
+  childSessionKey?: string;
 }
 
 interface TaskRoleSummary {
@@ -2510,6 +2573,9 @@ function dashboardSectionLinks(language: UiLanguage): DashboardSectionLink[] {
     if (item.key === "team") {
       return { ...item, label: "员工", blurb: "员工、分工与职责" };
     }
+    if (item.key === "collaboration") {
+      return { ...item, label: "协作", blurb: "智能体交接与协同" };
+    }
     if (item.key === "memory") {
       return { ...item, label: "记忆", blurb: "每日与长期记忆" };
     }
@@ -3651,6 +3717,18 @@ function pickLatestTimestamp(values: Array<string | undefined>): string | undefi
   return latestValue;
 }
 
+function isSameLocalCalendarDay(value: string | undefined, nowMs: number): boolean {
+  const parsed = toSortableMs(value);
+  if (!parsed) return false;
+  const a = new Date(parsed);
+  const b = new Date(nowMs);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
 function hasFreshRuntimeTimestamp(value: string | undefined, nowMs: number, windowMs: number): boolean {
   const parsed = toSortableMs(value);
   return parsed > 0 && nowMs - parsed <= windowMs;
@@ -3946,10 +4024,100 @@ function mergeSessionConversationItems(
 ): SessionConversationListItem[] {
   const merged = new Map<string, SessionConversationListItem>();
   for (const item of [...primary, ...secondary]) {
-    if (!item.sessionKey.trim() || merged.has(item.sessionKey)) continue;
-    merged.set(item.sessionKey, item);
+    const sessionKey = item.sessionKey.trim();
+    if (!sessionKey) continue;
+    const existing = merged.get(sessionKey);
+    merged.set(sessionKey, existing ? mergeSessionConversationItem(existing, item) : item);
   }
   return [...merged.values()];
+}
+
+function mergeSessionConversationItem(
+  existing: SessionConversationListItem,
+  incoming: SessionConversationListItem,
+): SessionConversationListItem {
+  return {
+    ...existing,
+    ...incoming,
+    label: incoming.label ?? existing.label,
+    agentId: incoming.agentId ?? existing.agentId,
+    state: incoming.state ?? existing.state,
+    lastMessageAt: pickLatestTimestamp([existing.lastMessageAt, incoming.lastMessageAt]) ?? incoming.lastMessageAt ?? existing.lastMessageAt,
+    taskSnippet: pickRicherSessionText(existing.taskSnippet, incoming.taskSnippet),
+    latestSnippet: pickRicherSessionText(existing.latestSnippet, incoming.latestSnippet),
+    latestRole: incoming.latestRole ?? existing.latestRole,
+    latestKind: incoming.latestKind ?? existing.latestKind,
+    latestToolName: incoming.latestToolName ?? existing.latestToolName,
+    latestHistoryAt: pickLatestTimestamp([existing.latestHistoryAt, incoming.latestHistoryAt]) ?? incoming.latestHistoryAt ?? existing.latestHistoryAt,
+    historyCount: Math.max(existing.historyCount, incoming.historyCount),
+    toolEventCount: Math.max(existing.toolEventCount, incoming.toolEventCount),
+    historyError: existing.historyError || incoming.historyError,
+    executionChain:
+      existing.executionChain && incoming.executionChain
+        ? mergeExecutionChainSummaries(existing.executionChain, incoming.executionChain)
+        : incoming.executionChain ?? existing.executionChain,
+    interSessionSignals: mergeInterSessionSignals(existing.interSessionSignals, incoming.interSessionSignals),
+  };
+}
+
+function pickRicherSessionText(current: string | undefined, incoming: string | undefined): string | undefined {
+  const currentText = normalizeInlineText(current ?? "");
+  const incomingText = normalizeInlineText(incoming ?? "");
+  if (!currentText) return incomingText || undefined;
+  if (!incomingText) return currentText || undefined;
+  if (incomingText.length > currentText.length) return incomingText;
+  return currentText;
+}
+
+function mergeExecutionChainSummaries(
+  current: SessionExecutionChainSummary,
+  incoming: SessionExecutionChainSummary,
+): SessionExecutionChainSummary {
+  const chosenStage =
+    executionChainStageRank(incoming.stage) >= executionChainStageRank(current.stage) ? incoming.stage : current.stage;
+  return {
+    accepted: current.accepted || incoming.accepted,
+    acceptedAt: pickLatestTimestamp([current.acceptedAt, incoming.acceptedAt]) ?? incoming.acceptedAt ?? current.acceptedAt,
+    spawned: current.spawned || incoming.spawned,
+    spawnedAt: pickLatestTimestamp([current.spawnedAt, incoming.spawnedAt]) ?? incoming.spawnedAt ?? current.spawnedAt,
+    parentSessionKey: incoming.parentSessionKey ?? current.parentSessionKey,
+    childSessionKey: incoming.childSessionKey ?? current.childSessionKey,
+    stage: chosenStage,
+    source: incoming.source === "history" || current.source !== "history" ? incoming.source : current.source,
+    inferred: current.inferred && incoming.inferred,
+    detail: pickRicherSessionText(current.detail, incoming.detail) ?? incoming.detail,
+  };
+}
+
+function mergeInterSessionSignals(
+  current: SessionInterSessionSignal[] | undefined,
+  incoming: SessionInterSessionSignal[] | undefined,
+): SessionInterSessionSignal[] | undefined {
+  const items = [...(current ?? []), ...(incoming ?? [])];
+  if (items.length === 0) return undefined;
+  const merged = new Map<string, SessionInterSessionSignal>();
+  for (const item of items) {
+    const key = [
+      normalizeLookupKey(item.sourceSessionKey),
+      normalizeLookupKey(item.sourceTool ?? ""),
+      normalizeLookupKey(item.timestamp ?? ""),
+      normalizeLookupKey(item.snippet),
+    ].join("::");
+    if (!merged.has(key)) merged.set(key, item);
+  }
+  return [...merged.values()].sort((a, b) => toSortableMs(a.timestamp) - toSortableMs(b.timestamp));
+}
+
+function pickSessionTaskSnippet(history: SessionHistoryMessage[]): string | undefined {
+  const candidates = history.filter(
+    (item) => (item.kind === "message" || item.kind === "inter_session") && item.content.trim(),
+  );
+  const preferred =
+    candidates.find((item) => /user|system/i.test(item.role)) ??
+    candidates.find((item) => !/assistant|tool/i.test(item.role)) ??
+    candidates[0];
+  const normalized = normalizeInlineText(preferred?.content ?? "");
+  return normalized || undefined;
 }
 
 async function loadSessionConversationItemsByKeys(
@@ -3981,6 +4149,7 @@ async function loadSessionConversationItemsByKeys(
       agentId: detail.session.agentId,
       state: detail.session.state,
       lastMessageAt: detail.session.lastMessageAt,
+      taskSnippet: pickSessionTaskSnippet(detail.history),
       latestSnippet: detail.latestSnippet,
       latestRole: detail.latestRole,
       latestKind: detail.latestKind,
@@ -3990,6 +4159,14 @@ async function loadSessionConversationItemsByKeys(
       toolEventCount: detail.history.filter((item) => item.kind === "tool_event").length,
       historyError: detail.historyError,
       executionChain: detail.executionChain,
+      interSessionSignals: detail.history
+        .filter((item) => item.kind === "inter_session" && (item.sourceSessionKey ?? "").trim())
+        .map((item) => ({
+          sourceSessionKey: item.sourceSessionKey!.trim(),
+          sourceTool: item.sourceTool,
+          timestamp: item.timestamp,
+          snippet: safeTruncate(normalizeInlineText(item.content), 220),
+        })),
     }));
 }
 
@@ -4042,6 +4219,35 @@ async function loadCachedSessionPreview(snapshot: ReadModelSnapshot, toolClient:
     historyLimit: 5,
   });
   renderSessionPreviewCache = {
+    snapshotAt: snapshot.generatedAt,
+    value,
+    expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
+  };
+  return value;
+}
+
+async function loadCachedCollaborationPreview(
+  snapshot: ReadModelSnapshot,
+  toolClient: ToolClient,
+): Promise<SessionConversationListResult> {
+  const now = Date.now();
+  if (
+    renderCollaborationPreviewCache &&
+    renderCollaborationPreviewCache.snapshotAt === snapshot.generatedAt &&
+    renderCollaborationPreviewCache.expiresAt > now
+  ) {
+    return renderCollaborationPreviewCache.value;
+  }
+
+  const value = await listSessionConversations({
+    snapshot,
+    client: toolClient,
+    filters: {},
+    page: 1,
+    pageSize: 40,
+    historyLimit: 8,
+  });
+  renderCollaborationPreviewCache = {
     snapshotAt: snapshot.generatedAt,
     value,
     expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
@@ -4254,14 +4460,20 @@ async function renderHtml(
           "Decide from one screen: system health, items needing your intervention, who is active, and AI burn.",
           "一个首页只回答四件事：系统是否正常、哪里需要你介入、谁在忙、AI 用量是否异常。",
         )
+      : activeSection === "collaboration"
+        ? t(
+            "Follow how work moves between agents: who accepted it, who received the handoff, and where collaboration is currently waiting.",
+            "直接看任务是怎么在智能体之间流转的：谁先接单、后来交给了谁、当前卡在哪一段协作里。",
+          )
       : activeSection === "projects-tasks"
         ? t(
             "Start with schedule and cron execution. Staff can be active from cron or ad-hoc sessions even when there is no tracked task row yet.",
             "先看排程和 Cron 执行。员工显示在工作，可能只是 Cron 或临时会话在跑，不一定已经落成可跟踪的任务条目。",
           )
         : sectionMeta.blurb;
-  const needsSessionPreview = activeSection === "projects-tasks" || activeSection === "overview";
-  const needsTaskEvidence = activeSection === "projects-tasks";
+  const needsSessionPreview =
+    activeSection === "projects-tasks" || activeSection === "overview" || activeSection === "collaboration";
+  const needsTaskEvidence = activeSection === "projects-tasks" || activeSection === "collaboration";
   const needsTeamSnapshot = activeSection === "team";
   const needsMemoryFiles = activeSection === "memory";
   const needsWorkspaceFiles = activeSection === "docs";
@@ -4269,6 +4481,7 @@ async function renderHtml(
   const needsSecuritySummary = activeSection === "settings";
   const needsUpdateSummary = activeSection === "settings";
   const needsMemoryState = activeSection === "memory";
+  const needsCollaborationThreads = activeSection === "collaboration";
   markRenderPhase("snapshot");
   const exceptions = commanderExceptions(snapshot);
   const exceptionsFeed = commanderExceptionsFeed(snapshot);
@@ -4295,6 +4508,17 @@ async function renderHtml(
         filters: {},
         items: [],
       };
+  const collaborationPreview =
+    needsCollaborationThreads
+      ? await loadCachedCollaborationPreview(snapshot, toolClient)
+      : {
+          generatedAt: snapshot.generatedAt,
+          total: 0,
+          page: 1,
+          pageSize: 0,
+          filters: {},
+          items: [],
+        };
   const sessionRows = renderSessionPreviewRows(sessionPreview.items, options.language);
   markRenderPhase("session-preview");
   const [cronOverview, openclawCronJobs, replayPreview, usageCost, officeRoster, officePresence] = await Promise.all([
@@ -4360,6 +4584,35 @@ async function renderHtml(
     sessionItems: taskSignalItems,
     language: options.language,
   });
+  const collaborationSessionKeys = needsCollaborationThreads
+    ? [...new Set(
+        taskExecutionChainCards
+          .flatMap((item) => [item.sessionKey, item.executionChain.parentSessionKey, item.executionChain.childSessionKey])
+          .map((value) => value?.trim() ?? "")
+          .filter(Boolean),
+      )]
+    : [];
+  const collaborationEvidenceItems =
+    needsCollaborationThreads && collaborationSessionKeys.length > 0
+      ? await loadCachedTaskEvidenceSessions(snapshot, toolClient, collaborationSessionKeys, 40)
+      : [];
+  const collaborationSignalItems = mergeSessionConversationItems(
+    collaborationEvidenceItems,
+    mergeSessionConversationItems(taskSignalItems, collaborationPreview.items),
+  );
+  const collaborationThreadCards = needsCollaborationThreads
+    ? mergeCollaborationThreadCards(
+        buildCollaborationThreadCards({
+          cards: taskExecutionChainCards,
+          sessionItems: collaborationSignalItems,
+          language: options.language,
+        }),
+        buildInterSessionCollaborationCards({
+          sessionItems: collaborationSignalItems,
+          language: options.language,
+        }),
+      )
+    : [];
   const taskCertaintyCards = buildTaskCertaintyCards({
     tasks,
     sessions: snapshot.sessions,
@@ -4374,6 +4627,25 @@ async function renderHtml(
   const runningExecutionChainCount = taskExecutionChainCards.filter((item) => item.executionChain.stage === "running").length;
   const mappedExecutionChainCount = taskExecutionChainCards.filter((item) => !item.unmapped).length;
   const taskExecutionChainHtml = renderTaskExecutionChainCards(taskExecutionChainCards, options.language);
+  const collaborationThreadHtml = renderCollaborationThreadCards(collaborationThreadCards, options.language);
+  const collaborationThreadVisibleCount = collaborationThreadCards.length;
+  const collaborationThreadTotalCount = collaborationThreadCards.reduce((sum, item) => sum + item.aggregateCount, 0);
+  const collaborationActiveCount = collaborationThreadCards.reduce(
+    (sum, item) => sum + (item.status === "active" ? item.aggregateCount : 0),
+    0,
+  );
+  const collaborationHandoffCount = collaborationThreadCards.reduce(
+    (sum, item) => sum + (item.status === "handoff" ? item.aggregateCount : 0),
+    0,
+  );
+  const collaborationBlockedCount = collaborationThreadCards.reduce(
+    (sum, item) => sum + (item.status === "blocked" ? item.aggregateCount : 0),
+    0,
+  );
+  const collaborationCompletedTodayCount = collaborationThreadCards.reduce((sum, item) => {
+    if (item.status !== "completed") return sum;
+    return sum + item.aggregateItems.filter((entry) => isSameLocalCalendarDay(entry.latestAt, Date.now())).length;
+  }, 0);
   const taskRoleSummaries = buildTaskRoleSummaries(controlCenterMappingTasks);
   const pendingApprovalsCount = allApprovals.filter((item) => item.status === "pending").length;
   const inProgressTasksCount = realTasks.filter((task) => task.status === "in_progress").length;
@@ -5566,6 +5838,66 @@ async function renderHtml(
       </div>
     </details>
   `;
+  const collaborationSection = `
+    <section class="card" id="collaboration-hub">
+      <div class="overview-command-head">
+        <div>
+          <h2>${escapeHtml(t("Team collaboration", "团队协作"))}</h2>
+          <div class="meta">${escapeHtml(t("See both collaboration patterns in one place: parent-child relays and cross-session messages between existing agent sessions.", "把两种协作都放在同一页看清楚：父子会话接力，以及不同智能体既有会话之间的消息往返。"))}</div>
+        </div>
+        <div>${badge(collaborationBlockedCount > 0 ? "warn" : collaborationActiveCount > 0 ? "info" : "ok", collaborationBlockedCount > 0 ? t("Needs follow-up", "需跟进") : collaborationActiveCount > 0 ? t("Active", "进行中") : t("Steady", "平稳"))}</div>
+      </div>
+      <div class="status-strip collaboration-summary-grid">
+        <div class="status-chip">
+          <span>${escapeHtml(t("Active", "活跃协作"))}</span>
+          <strong>${collaborationActiveCount}</strong>
+        </div>
+        <div class="status-chip">
+          <span>${escapeHtml(t("Waiting handoff", "等待交接"))}</span>
+          <strong>${collaborationHandoffCount}</strong>
+        </div>
+        <div class="status-chip">
+          <span>${escapeHtml(t("Blocked", "卡住"))}</span>
+          <strong>${collaborationBlockedCount}</strong>
+        </div>
+        <div class="status-chip">
+          <span>${escapeHtml(t("Completed today", "今日完成"))}</span>
+          <strong>${collaborationCompletedTodayCount}</strong>
+        </div>
+      </div>
+      <div class="meta collaboration-headline">${escapeHtml(
+        collaborationThreadVisibleCount > 0
+          ? collaborationThreadTotalCount > collaborationThreadVisibleCount
+            ? t(
+                `${collaborationThreadTotalCount} collaboration threads are visible in total. Similar completed threads are folded into ${collaborationThreadVisibleCount} cards so this page stays readable.`,
+                `当前共整理出 ${collaborationThreadTotalCount} 条协作线程，并把相近的已完成线程折叠为 ${collaborationThreadVisibleCount} 张卡片，方便直接看重点。`,
+              )
+            : t(
+                `${collaborationThreadVisibleCount} visible collaboration threads. Open a thread to inspect parent-child relays or cross-session messages without leaving this page.`,
+                `当前可见 ${collaborationThreadVisibleCount} 条协作线程。直接展开线程，就能在当前页查看父子接力或跨会话消息时间线。`,
+              )
+          : t(
+              "No visible collaboration threads yet. They will appear once parent-child relays or cross-session messages become visible.",
+              "当前还没有可见的协作线程。父子接力或跨会话通信出现后，这里就会开始显示。",
+            ),
+      )}</div>
+    </section>
+    <section class="card" id="collaboration-board" data-collab-root>
+      <div class="overview-command-head">
+        <h2>${escapeHtml(t("Collaboration threads", "协作线程"))}</h2>
+        <div class="meta" data-collab-filter-state>${escapeHtml(t("Showing all visible threads", "当前显示全部可见线程"))}</div>
+      </div>
+      <div class="segment-switch collaboration-filter-bar" role="tablist" aria-label="${escapeHtml(t("Collaboration filters", "协作筛选"))}">
+        <button class="segment-item active" type="button" data-collab-filter="all">${escapeHtml(t("All", "全部"))}</button>
+        <button class="segment-item" type="button" data-collab-filter="active">${escapeHtml(t("In progress", "进行中"))}</button>
+        <button class="segment-item" type="button" data-collab-filter="blocked">${escapeHtml(t("Blocked", "卡住"))}</button>
+        <button class="segment-item" type="button" data-collab-filter="completed">${escapeHtml(t("Completed", "已完成"))}</button>
+        <button class="segment-item" type="button" data-collab-filter="multi-agent">${escapeHtml(t("Multi-agent only", "只看多智能体"))}</button>
+        <button class="segment-item" type="button" data-collab-filter="main-dispatched">${escapeHtml(t("Main dispatched", "只看 Main 派发"))}</button>
+      </div>
+      ${collaborationThreadHtml}
+    </section>
+  `;
   const memoryMainCount = memoryFiles.filter((entry) => entry.facetKey === "main").length;
   const memoryWorkbench = needsMemoryFiles
     ? await renderEditableFileWorkbench({
@@ -5966,6 +6298,7 @@ async function renderHtml(
   let sectionBody = overviewSection;
   if (options.section === "calendar") sectionBody = projectsSection;
   if (options.section === "team") sectionBody = teamUnifiedSection;
+  if (options.section === "collaboration") sectionBody = collaborationSection;
   if (options.section === "memory") sectionBody = memorySection;
   if (options.section === "docs") sectionBody = docsSection;
   if (options.section === "usage-cost") sectionBody = usageSection;
@@ -6007,6 +6340,7 @@ async function renderHtml(
   const fileWorkbenchScript = renderFileWorkbenchScript();
   const agentVisualEnhancerScript = renderAgentVisualEnhancerScript();
   const nativeMotionScript = renderNativeMotionScript(options.language);
+  const collaborationFilterScript = renderCollaborationFilterScript(options.language);
   const quotaResetScript = renderQuotaResetScript();
   const renderTotalMs = Math.round(performance.now() - renderStartedAt);
   if (renderTotalMs >= 1000) {
@@ -7128,6 +7462,230 @@ async function renderHtml(
       overflow-wrap: anywhere;
       word-break: break-word;
     }
+    .collaboration-summary-grid {
+      margin-top: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .collaboration-headline {
+      margin-top: 10px;
+    }
+    .collaboration-filter-bar {
+      margin-top: 12px;
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .collaboration-thread-list {
+      margin-top: 14px;
+      display: grid;
+      gap: 14px;
+    }
+    .collaboration-thread-card {
+      padding: 0;
+      overflow: hidden;
+    }
+    .collaboration-thread-card > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+    .collaboration-thread-card > summary::-webkit-details-marker {
+      display: none;
+    }
+    .collaboration-thread-card > summary::marker {
+      display: none;
+    }
+    .collaboration-thread-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+    }
+    .collaboration-route-avatars {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .collaboration-participant {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      min-width: 72px;
+      flex: 0 0 auto;
+    }
+    .collaboration-participant-label {
+      font-size: 11px;
+      line-height: 1.35;
+      color: #6e7680;
+      font-weight: 620;
+      letter-spacing: 0.01em;
+      text-align: center;
+    }
+    .collaboration-route-arrow {
+      color: #6e7680;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .collaboration-avatar {
+      max-width: 72px;
+      width: 72px;
+      padding: 6px;
+      border-radius: 16px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.84),
+        0 10px 22px rgba(17, 24, 39, 0.06);
+    }
+    .collaboration-avatar .agent-stage {
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+    }
+    .collaboration-avatar .agent-animal-label {
+      display: none;
+    }
+    .collaboration-avatar.is-current {
+      border-color: rgba(0, 113, 227, 0.22);
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 113, 227, 0.1),
+        0 12px 26px rgba(0, 113, 227, 0.12);
+      background:
+        linear-gradient(180deg, rgba(240, 247, 255, 0.99), rgba(255, 255, 255, 0.98)),
+        radial-gradient(circle at 50% 0%, rgba(0, 113, 227, 0.08), transparent 60%);
+    }
+    .collaboration-thread-copy {
+      min-width: 0;
+      display: grid;
+      gap: 5px;
+    }
+    .collaboration-thread-copy strong {
+      font-size: 24px;
+      line-height: 1.08;
+      letter-spacing: -0.035em;
+      color: #1d1d1f;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+    .collaboration-thread-badges {
+      display: grid;
+      justify-items: end;
+      gap: 8px;
+    }
+    .collaboration-current-owner {
+      font-size: 12px;
+      line-height: 1.45;
+      color: #5f6670;
+      font-weight: 620;
+      text-align: right;
+    }
+    .collaboration-thread-teaser {
+      display: grid;
+      gap: 8px;
+    }
+    .collaboration-latest-snippet {
+      border: 1px solid rgba(0, 113, 227, 0.12);
+      border-radius: 16px;
+      padding: 12px 14px;
+      background:
+        linear-gradient(180deg, rgba(246, 250, 255, 0.98), rgba(255, 255, 255, 0.98)),
+        radial-gradient(circle at 0% 0%, rgba(0, 113, 227, 0.06), transparent 52%);
+      color: #294866;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .collaboration-thread-body {
+      border-top: 1px solid rgba(17, 24, 39, 0.07);
+      padding: 0 18px 18px;
+      display: grid;
+      gap: 14px;
+    }
+    .collaboration-timeline {
+      list-style: none;
+      margin: 0;
+      padding: 14px 0 0;
+      display: grid;
+      gap: 12px;
+    }
+    .collaboration-timeline-step {
+      display: grid;
+      grid-template-columns: 176px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding-top: 12px;
+      border-top: 1px solid rgba(17, 24, 39, 0.06);
+    }
+    .collaboration-timeline-step:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+    .collaboration-agent-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(17, 24, 39, 0.09);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 251, 255, 0.96)),
+        radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--agent-accent) 14%, transparent), transparent 58%);
+      color: #223546;
+      font-size: 13px;
+      font-weight: 650;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.86);
+    }
+    .collaboration-agent-pill-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--agent-accent);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.72);
+      flex: 0 0 auto;
+    }
+    .collaboration-step-copy {
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .collaboration-step-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .collaboration-step-head strong {
+      font-size: 15px;
+      color: #1d1d1f;
+      letter-spacing: -0.01em;
+    }
+    .collaboration-step-head span {
+      font-size: 12px;
+      color: #6e7680;
+    }
+    .collaboration-thread-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .collaboration-folded-note {
+      margin-top: 2px;
+    }
+    .collaboration-folded-list {
+      margin: 8px 0 0;
+    }
+    .collaboration-thread-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .collaboration-technical-details {
+      margin-top: -4px;
+    }
     .timeline-summary-strip {
       margin-top: 10px;
       display: grid;
@@ -7946,6 +8504,7 @@ async function renderHtml(
       .overview-busy-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .office-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .staff-brief-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .collaboration-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 1320px) {
       .app-shell { grid-template-columns: 1fr 284px; }
@@ -7962,6 +8521,10 @@ async function renderHtml(
       .overview-busy-grid { grid-template-columns: 1fr; }
       .dashboard-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .execution-chain-list { grid-template-columns: 1fr; }
+      .collaboration-thread-head { grid-template-columns: 1fr; }
+      .collaboration-thread-badges { justify-items: start; }
+      .collaboration-current-owner { text-align: left; }
+      .collaboration-timeline-step { grid-template-columns: 1fr; }
       .file-workbench { grid-template-columns: 1fr; }
       .staff-brief-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -7987,6 +8550,9 @@ async function renderHtml(
       .task-hub-board-grid { grid-template-columns: 1fr; }
       .overview-pulse-card .status-strip { grid-template-columns: 1fr; }
       .dashboard-strip { grid-template-columns: 1fr; }
+      .collaboration-summary-grid { grid-template-columns: 1fr; }
+      .collaboration-route-avatars { flex-wrap: wrap; }
+      .collaboration-avatar { width: 54px; max-width: 54px; }
       .signal-gauge-main { grid-template-columns: 64px minmax(0, 1fr); }
       .office-grid { grid-template-columns: 1fr; }
       .staff-brief-head { grid-template-columns: 1fr; }
@@ -8078,6 +8644,7 @@ async function renderHtml(
   ${agentVisualEnhancerScript}
   ${fileWorkbenchScript}
   ${nativeMotionScript}
+  ${collaborationFilterScript}
   ${quotaResetScript}
 </body>
 </html>`;
@@ -11016,6 +11583,1065 @@ function renderTaskExecutionChainCards(
     .join("")}</div>`;
 }
 
+function buildCollaborationThreadCards(input: {
+  cards: TaskExecutionChainCard[];
+  sessionItems: SessionConversationListItem[];
+  language: UiLanguage;
+}): CollaborationThreadCard[] {
+  const sessionByKey = new Map(input.sessionItems.map((item) => [item.sessionKey, item]));
+
+  const resolved: CollaborationThreadCard[] = input.cards.map((card): CollaborationThreadCard => {
+    const chain = card.executionChain;
+    const parentSessionKey = chain.parentSessionKey ?? card.sessionKey;
+    const childSessionKey = chain.childSessionKey;
+    const hasChildSession = Boolean(childSessionKey);
+    const parentSession = sessionByKey.get(parentSessionKey);
+    const childSession = childSessionKey ? sessionByKey.get(childSessionKey) : undefined;
+    const ownerAgentId = normalizeAgentIdCandidate(card.agentId ?? card.owner);
+    const parentAgentId =
+      normalizeAgentIdCandidate(parentSession?.agentId) ??
+      normalizeAgentIdCandidate(extractAgentIdFromSessionKey(parentSessionKey ?? "")) ??
+      ownerAgentId ??
+      "main";
+    const childAgentId =
+      normalizeAgentIdCandidate(childSession?.agentId) ??
+      normalizeAgentIdCandidate(extractAgentIdFromSessionKey(childSessionKey ?? "")) ??
+      normalizeAgentIdCandidate(card.agentId) ??
+      parentAgentId;
+    const routeAgentIds = childSessionKey ? [parentAgentId, childAgentId] : [parentAgentId];
+    const status = resolveCollaborationThreadStatus(card);
+    const currentOwnerAgentId = resolveCollaborationCurrentOwner(card, parentAgentId, childAgentId);
+    const currentOwnerRole: "parent" | "child" = hasChildSession || chain.spawned ? "child" : "parent";
+    const latestAt = pickLatestTimestamp([
+      childSession?.latestHistoryAt,
+      childSession?.lastMessageAt,
+      parentSession?.latestHistoryAt,
+      parentSession?.lastMessageAt,
+      card.latestAt,
+      chain.spawnedAt,
+      chain.acceptedAt,
+    ]);
+    const participants = routeAgentIds.map((agentId, index) => ({
+      agentId,
+      label: humanizeOperatorLabel(agentId),
+      identity: deriveAgentAnimalIdentity(agentId),
+      current: normalizeLookupKey(agentId) === normalizeLookupKey(currentOwnerAgentId ?? ""),
+      roleLabel: collaborationParticipantRoleLabel(index === 0 ? "parent" : "child", input.language),
+    }));
+    const uniqueParticipantCount = new Set(routeAgentIds.map((agentId) => normalizeLookupKey(agentId))).size;
+    const multiAgent = uniqueParticipantCount > 1;
+    const mainDispatched =
+      routeAgentIds.length > 1 && normalizeLookupKey(routeAgentIds[0] ?? "") === "main";
+    const routeTitle = collaborationRouteLabel(parentAgentId, childAgentId, hasChildSession, input.language);
+    const taskTitle = deriveCollaborationTaskTitle({
+      card,
+      parentSession,
+      childSession,
+      language: input.language,
+    });
+    const latestSnippetSource =
+      childSession?.latestSnippet ?? parentSession?.latestSnippet ?? card.latestSnippet ?? chain.detail;
+    const latestSnippet = summarizeVisibleSessionSnippet(latestSnippetSource, input.language, 120);
+    const timeline = buildCollaborationTimelineSteps({
+      card,
+      parentAgentId,
+      childAgentId,
+      parentSession,
+      childSession,
+      language: input.language,
+    });
+
+    return {
+      id: `${card.sessionKey}:${routeAgentIds.join("->")}`,
+      kind: "parent_child",
+      sessionKey: card.sessionKey,
+      taskTitle,
+      routeTitle,
+      summary: collaborationThreadSummary({
+        card,
+        status,
+        parentAgentId,
+        childAgentId,
+        language: input.language,
+      }),
+      status,
+      statusBadge: collaborationThreadStatusLabel(status, input.language),
+      kindBadge: collaborationThreadKindLabel("parent_child", input.language),
+      currentOwnerLabel: collaborationRoleAgentLabel(
+        currentOwnerRole,
+        currentOwnerAgentId ?? routeAgentIds.at(-1) ?? parentAgentId,
+        input.language,
+      ),
+      currentOwnerAgentId,
+      currentOwnerRole,
+      latestAt,
+      latestAtLabel: latestAt
+        ? pickUiText(input.language, `Updated ${formatTimeAgoFromNow(latestAt, input.language)}`, `最近更新 ${formatTimeAgoFromNow(latestAt, input.language)}`)
+        : pickUiText(input.language, "No visible update yet", "还没有可见更新"),
+      participants,
+      routeJoiner: "→",
+      multiAgent,
+      mainDispatched,
+      aggregateCount: 1,
+      aggregateItems: [{ sessionKey: card.sessionKey, sessionHref: card.sessionHref, latestAt }],
+      taskHref: card.taskHref,
+      sessionHref: card.sessionHref,
+      timeline,
+      latestSnippet,
+      sourceLabel: executionChainSourceLabel(chain, input.language),
+      parentSessionKey,
+      childSessionKey,
+    };
+  });
+
+  const grouped = foldCollaborationThreadCards(resolved, input.language);
+
+  return grouped.sort((a, b) => {
+    const statusRank = collaborationStatusRank(b.status) - collaborationStatusRank(a.status);
+    if (statusRank !== 0) return statusRank;
+    const timeRank = toSortableMs(b.latestAt) - toSortableMs(a.latestAt);
+    if (timeRank !== 0) return timeRank;
+    return a.routeTitle.localeCompare(b.routeTitle);
+  });
+}
+
+function foldCollaborationThreadCards(
+  cards: CollaborationThreadCard[],
+  language: UiLanguage,
+): CollaborationThreadCard[] {
+  const passthrough: CollaborationThreadCard[] = [];
+  const groups = new Map<string, CollaborationThreadCard[]>();
+
+  for (const card of cards) {
+    const shouldFold = card.status === "completed" && !card.multiAgent;
+    if (!shouldFold) {
+      passthrough.push(card);
+      continue;
+    }
+    const groupKey = [
+      normalizeLookupKey(card.routeTitle),
+      normalizeLookupKey(card.taskTitle),
+      normalizeLookupKey(card.currentOwnerAgentId ?? ""),
+    ].join("::");
+    const existing = groups.get(groupKey) ?? [];
+    existing.push(card);
+    groups.set(groupKey, existing);
+  }
+
+  const folded: CollaborationThreadCard[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      folded.push(group[0]);
+      continue;
+    }
+    const ordered = [...group].sort((a, b) => toSortableMs(b.latestAt) - toSortableMs(a.latestAt));
+    const latest = ordered[0];
+    const aggregateItems = ordered.map((item) => ({
+      sessionKey: item.sessionKey,
+      sessionHref: item.sessionHref,
+      latestAt: item.latestAt,
+    }));
+    const ownerLabel = latest.currentOwnerLabel;
+    const countLabel = pickUiText(language, `${group.length} similar runs`, `${group.length} 条相近协作`);
+    folded.push({
+      ...latest,
+      summary: pickUiText(
+        language,
+        `${ownerLabel} finished ${group.length} similar collaboration runs recently. The latest timeline stays expanded here, and the rest are folded into this card.`,
+        `${ownerLabel} 最近完成了 ${group.length} 条相近协作。这里保留最新一条时间线，其余同类线程已折叠到这张卡里。`,
+      ),
+      latestAtLabel: latest.latestAt
+        ? pickUiText(
+            language,
+            `Updated ${formatTimeAgoFromNow(latest.latestAt, language)} · ${countLabel}`,
+            `最近更新 ${formatTimeAgoFromNow(latest.latestAt, language)} · ${countLabel}`,
+          )
+        : pickUiText(language, `No visible update yet · ${countLabel}`, `还没有可见更新 · ${countLabel}`),
+      aggregateCount: group.length,
+      aggregateItems,
+      sourceLabel: pickUiText(
+        language,
+        `Showing the latest representative thread. ${group.length} similar completed runs are folded together.`,
+        `当前展示最新一条代表线程；另有 ${group.length} 条相近的已完成协作已折叠显示。`,
+      ),
+    });
+  }
+
+  return [...passthrough, ...folded];
+}
+
+function buildInterSessionCollaborationCards(input: {
+  sessionItems: SessionConversationListItem[];
+  language: UiLanguage;
+}): CollaborationThreadCard[] {
+  const sessionByKey = new Map(input.sessionItems.map((item) => [item.sessionKey, item]));
+  const grouped = new Map<
+    string,
+    Array<{
+      sourceSessionKey: string;
+      targetSessionKey: string;
+      sourceTool?: string;
+      snippet: string;
+      at?: string;
+    }>
+  >();
+
+  for (const targetSession of input.sessionItems) {
+    for (const signal of targetSession.interSessionSignals ?? []) {
+      const sourceKey = signal.sourceSessionKey.trim();
+      const targetKey = targetSession.sessionKey.trim();
+      if (!sourceKey || !targetKey || normalizeLookupKey(sourceKey) === normalizeLookupKey(targetKey)) continue;
+      const sourceSession = sessionByKey.get(sourceKey);
+      const taskSeed = normalizeLookupKey(
+        deriveInterSessionTaskTitle({
+          signalSnippet: signal.snippet,
+          sourceSession,
+          targetSession,
+          language: input.language,
+        }),
+      );
+      const pairKey = [sourceKey, targetKey].sort().join("::");
+      const groupKey = `${pairKey}::${taskSeed || "shared"}`;
+      const existing = grouped.get(groupKey) ?? [];
+      existing.push({
+        sourceSessionKey: sourceKey,
+        targetSessionKey: targetKey,
+        sourceTool: signal.sourceTool,
+        snippet: signal.snippet,
+        at: signal.timestamp,
+      });
+      grouped.set(groupKey, existing);
+    }
+  }
+
+  const cards: CollaborationThreadCard[] = [];
+  for (const signals of grouped.values()) {
+    const orderedSignals = [...signals].sort((a, b) => toSortableMs(a.at) - toSortableMs(b.at));
+    const latest = orderedSignals.at(-1);
+    if (!latest) continue;
+
+    const sourceSession = sessionByKey.get(latest.sourceSessionKey);
+    const targetSession = sessionByKey.get(latest.targetSessionKey);
+    const sourceAgentId =
+      normalizeAgentIdCandidate(sourceSession?.agentId) ??
+      normalizeAgentIdCandidate(extractAgentIdFromSessionKey(latest.sourceSessionKey)) ??
+      "main";
+    const targetAgentId =
+      normalizeAgentIdCandidate(targetSession?.agentId) ??
+      normalizeAgentIdCandidate(extractAgentIdFromSessionKey(latest.targetSessionKey)) ??
+      "main";
+    const bidirectional =
+      orderedSignals.some(
+        (signal) =>
+          normalizeLookupKey(signal.sourceSessionKey) === normalizeLookupKey(latest.targetSessionKey) &&
+          normalizeLookupKey(signal.targetSessionKey) === normalizeLookupKey(latest.sourceSessionKey),
+      );
+    const latestAt = pickLatestTimestamp([
+      latest.at,
+      targetSession?.latestHistoryAt,
+      targetSession?.lastMessageAt,
+      sourceSession?.latestHistoryAt,
+      sourceSession?.lastMessageAt,
+    ]);
+    const status = resolveInterSessionCollaborationStatus({
+      sourceSession,
+      targetSession,
+      bidirectional,
+    });
+    const currentOwnerAgentId = targetAgentId;
+    const taskTitle = deriveInterSessionTaskTitle({
+      signalSnippet: latest.snippet,
+      sourceSession,
+      targetSession,
+      language: input.language,
+    });
+    const participants: CollaborationParticipant[] = [
+      {
+        agentId: sourceAgentId,
+        label: humanizeOperatorLabel(sourceAgentId),
+        identity: deriveAgentAnimalIdentity(sourceAgentId),
+        current: normalizeLookupKey(sourceAgentId) === normalizeLookupKey(currentOwnerAgentId),
+        roleLabel: pickUiText(input.language, "Sending session", "发送会话"),
+      },
+      {
+        agentId: targetAgentId,
+        label: humanizeOperatorLabel(targetAgentId),
+        identity: deriveAgentAnimalIdentity(targetAgentId),
+        current: normalizeLookupKey(targetAgentId) === normalizeLookupKey(currentOwnerAgentId),
+        roleLabel: pickUiText(input.language, "Receiving session", "接收会话"),
+      },
+    ];
+    cards.push({
+      id: `inter-session:${latest.sourceSessionKey}->${latest.targetSessionKey}:${normalizeLookupKey(taskTitle)}`,
+      kind: "inter_session",
+      sessionKey: latest.targetSessionKey,
+      taskTitle,
+      routeTitle: collaborationInterSessionRouteLabel(sourceAgentId, targetAgentId, input.language),
+      summary: collaborationInterSessionSummary({
+        status,
+        sourceAgentId,
+        targetAgentId,
+        bidirectional,
+        language: input.language,
+      }),
+      status,
+      statusBadge: collaborationThreadStatusLabel(status, input.language),
+      kindBadge: collaborationThreadKindLabel("inter_session", input.language),
+      currentOwnerLabel: collaborationInterSessionCurrentOwnerLabel(targetAgentId, input.language),
+      currentOwnerAgentId,
+      currentOwnerRole: "target",
+      latestAt,
+      latestAtLabel: latestAt
+        ? pickUiText(input.language, `Updated ${formatTimeAgoFromNow(latestAt, input.language)}`, `最近更新 ${formatTimeAgoFromNow(latestAt, input.language)}`)
+        : pickUiText(input.language, "No visible update yet", "还没有可见更新"),
+      participants,
+      routeJoiner: "⇄",
+      multiAgent: normalizeLookupKey(sourceAgentId) !== normalizeLookupKey(targetAgentId),
+      mainDispatched: normalizeLookupKey(sourceAgentId) === "main",
+      aggregateCount: 1,
+      aggregateItems: [
+        {
+          sessionKey: latest.targetSessionKey,
+          sessionHref: buildSessionDetailHref(latest.targetSessionKey, input.language),
+          latestAt,
+        },
+      ],
+      taskHref: undefined,
+      sessionHref: buildSessionDetailHref(latest.targetSessionKey, input.language),
+      timeline: buildInterSessionCollaborationTimelineSteps({
+        sourceAgentId,
+        targetAgentId,
+        sourceSession,
+        targetSession,
+        signals: orderedSignals,
+        language: input.language,
+      }),
+      latestSnippet: summarizeVisibleSessionSnippet(latest.snippet, input.language, 140),
+      sourceLabel: pickUiText(
+        input.language,
+        `Verified via inter-session message (${latest.sourceTool ?? "inter-session"}).`,
+        `已通过跨会话消息验证（${latest.sourceTool ?? "inter-session"}）。`,
+      ),
+      parentSessionKey: latest.sourceSessionKey,
+      childSessionKey: latest.targetSessionKey,
+    });
+  }
+
+  return cards;
+}
+
+function mergeCollaborationThreadCards(
+  primary: CollaborationThreadCard[],
+  secondary: CollaborationThreadCard[],
+): CollaborationThreadCard[] {
+  const combined = [...primary, ...secondary];
+  return combined.sort((a, b) => {
+    const statusRank = collaborationStatusRank(b.status) - collaborationStatusRank(a.status);
+    if (statusRank !== 0) return statusRank;
+    const timeRank = toSortableMs(b.latestAt) - toSortableMs(a.latestAt);
+    if (timeRank !== 0) return timeRank;
+    if (a.kind !== b.kind) return a.kind === "inter_session" ? -1 : 1;
+    return a.routeTitle.localeCompare(b.routeTitle);
+  });
+}
+
+function collaborationThreadKindLabel(
+  kind: CollaborationThreadKind,
+  language: UiLanguage = "zh",
+): string {
+  if (kind === "inter_session") {
+    return pickUiText(language, "Cross-session communication", "跨会话通信");
+  }
+  return pickUiText(language, "Parent-child relay", "父子协作");
+}
+
+function deriveInterSessionTaskTitle(input: {
+  signalSnippet: string;
+  sourceSession?: SessionConversationListItem;
+  targetSession?: SessionConversationListItem;
+  language: UiLanguage;
+}): string {
+  const candidates = [
+    input.sourceSession?.taskSnippet,
+    input.targetSession?.taskSnippet,
+    input.sourceSession?.label,
+    input.targetSession?.label,
+    input.signalSnippet,
+    input.sourceSession?.latestSnippet,
+    input.targetSession?.latestSnippet,
+  ];
+  for (const candidate of candidates) {
+    const derived = extractCollaborationTaskLabel(candidate ?? "", input.language);
+    if (derived?.trim()) return derived;
+  }
+  return pickUiText(input.language, "Cross-session communication", "跨会话沟通");
+}
+
+function resolveInterSessionCollaborationStatus(input: {
+  sourceSession?: SessionConversationListItem;
+  targetSession?: SessionConversationListItem;
+  bidirectional: boolean;
+}): CollaborationThreadStatus {
+  const states = [input.sourceSession?.state, input.targetSession?.state];
+  if (states.some((state) => state === "blocked" || state === "error" || state === "waiting_approval")) {
+    return "blocked";
+  }
+  if (states.some((state) => state === "running")) {
+    return "active";
+  }
+  if (!input.bidirectional) {
+    return "handoff";
+  }
+  const latestAt = pickLatestTimestamp([
+    input.sourceSession?.latestHistoryAt,
+    input.sourceSession?.lastMessageAt,
+    input.targetSession?.latestHistoryAt,
+    input.targetSession?.lastMessageAt,
+  ]);
+  const latestMs = toSortableMs(latestAt);
+  if (latestMs && Date.now() - latestMs <= 15 * 60 * 1000) {
+    return "active";
+  }
+  return "completed";
+}
+
+function collaborationInterSessionRouteLabel(
+  sourceAgentId: string,
+  targetAgentId: string,
+  language: UiLanguage = "zh",
+): string {
+  return `${pickUiText(language, "Sending session", "发送会话")} ${humanizeOperatorLabel(sourceAgentId)} ⇄ ${pickUiText(language, "Receiving session", "接收会话")} ${humanizeOperatorLabel(targetAgentId)}`;
+}
+
+function collaborationInterSessionSummary(input: {
+  status: CollaborationThreadStatus;
+  sourceAgentId: string;
+  targetAgentId: string;
+  bidirectional: boolean;
+  language: UiLanguage;
+}): string {
+  const sourceLabel = humanizeOperatorLabel(input.sourceAgentId);
+  const targetLabel = humanizeOperatorLabel(input.targetAgentId);
+  if (input.status === "blocked") {
+    return pickUiText(
+      input.language,
+      `${targetLabel} did not finish the latest cross-session reply and needs follow-up.`,
+      `${targetLabel} 没有顺利完成最近一轮跨会话回复，当前需要跟进。`,
+    );
+  }
+  if (input.status === "active") {
+    return input.bidirectional
+      ? pickUiText(
+          input.language,
+          `${sourceLabel} and ${targetLabel} are actively exchanging messages between existing sessions.`,
+          `${sourceLabel} 和 ${targetLabel} 正在已有会话之间来回通信。`,
+        )
+      : pickUiText(
+          input.language,
+          `${sourceLabel} has sent a message into ${targetLabel}'s existing session, and the visible reply is still in progress.`,
+          `${sourceLabel} 已向 ${targetLabel} 的既有会话发出消息，当前还在等待这轮可见回复继续回来。`,
+        );
+  }
+  if (input.status === "handoff") {
+    return pickUiText(
+      input.language,
+      `${sourceLabel} has sent a message into ${targetLabel}'s existing session. The next visible reply has not returned yet.`,
+      `${sourceLabel} 已把消息投递到 ${targetLabel} 的既有会话，下一条可见回复还没有回来。`,
+    );
+  }
+  return input.bidirectional
+    ? pickUiText(
+        input.language,
+        `${targetLabel} has already replied through its existing session. The latest visible exchange is complete.`,
+        `${targetLabel} 已经通过自己的既有会话回了信，最近一轮可见通信已经完成。`,
+      )
+    : pickUiText(
+        input.language,
+        `${sourceLabel} finished the latest visible cross-session exchange with ${targetLabel}.`,
+        `${sourceLabel} 和 ${targetLabel} 最近一轮可见跨会话通信已经结束。`,
+      );
+}
+
+function collaborationInterSessionCurrentOwnerLabel(
+  currentOwnerAgentId: string,
+  language: UiLanguage = "zh",
+): string {
+  return pickUiText(
+    language,
+    `Now with ${humanizeOperatorLabel(currentOwnerAgentId)}`,
+    `当前在 ${humanizeOperatorLabel(currentOwnerAgentId)}`,
+  );
+}
+
+function buildInterSessionCollaborationTimelineSteps(input: {
+  sourceAgentId: string;
+  targetAgentId: string;
+  sourceSession?: SessionConversationListItem;
+  targetSession?: SessionConversationListItem;
+  signals: Array<{
+    sourceSessionKey: string;
+    targetSessionKey: string;
+    sourceTool?: string;
+    snippet: string;
+    at?: string;
+  }>;
+  language: UiLanguage;
+}): CollaborationTimelineStep[] {
+  const steps: CollaborationTimelineStep[] = [];
+  const firstSignal = input.signals[0];
+  if (firstSignal) {
+    steps.push({
+      id: `${firstSignal.sourceSessionKey}:${firstSignal.targetSessionKey}:send`,
+      agentId: input.sourceAgentId,
+      roleLabel: pickUiText(input.language, "Sending session", "发送会话"),
+      title: pickUiText(input.language, "Sent a cross-session message", "发起跨会话消息"),
+      detail: summarizeVisibleSessionSnippet(firstSignal.snippet, input.language, 120),
+      at: firstSignal.at ?? input.sourceSession?.latestHistoryAt ?? input.sourceSession?.lastMessageAt,
+      tone: "info",
+    });
+  }
+
+  for (const [index, signal] of input.signals.slice(1, 3).entries()) {
+    const sourceAgentId =
+      normalizeAgentIdCandidate(extractAgentIdFromSessionKey(signal.sourceSessionKey)) ?? input.sourceAgentId;
+    const isReply = normalizeLookupKey(sourceAgentId) === normalizeLookupKey(input.targetAgentId);
+    steps.push({
+      id: `${signal.sourceSessionKey}:${signal.targetSessionKey}:${index}`,
+      agentId: sourceAgentId,
+      roleLabel: pickUiText(
+        input.language,
+        isReply ? "Replying session" : "Sending session",
+        isReply ? "回复会话" : "发送会话",
+      ),
+      title: pickUiText(
+        input.language,
+        isReply ? "Replied through its existing session" : "Sent another cross-session message",
+        isReply ? "通过既有会话回信" : "继续发送跨会话消息",
+      ),
+      detail: summarizeVisibleSessionSnippet(signal.snippet, input.language, 120),
+      at: signal.at,
+      tone: index === input.signals.slice(1, 3).length - 1 ? "ok" : "info",
+    });
+  }
+
+  const latestSignal = input.signals.at(-1);
+  if (latestSignal && (!firstSignal || normalizeInlineText(latestSignal.snippet) !== normalizeInlineText(firstSignal.snippet))) {
+    const latestAgentId =
+      normalizeAgentIdCandidate(extractAgentIdFromSessionKey(latestSignal.sourceSessionKey)) ?? input.targetAgentId;
+    steps.push({
+      id: `${latestSignal.sourceSessionKey}:${latestSignal.targetSessionKey}:latest`,
+      agentId: latestAgentId,
+      roleLabel: pickUiText(input.language, "Latest visible reply", "最近可见回复"),
+      title: pickUiText(input.language, "Latest visible message", "最近可见消息"),
+      detail: summarizeVisibleSessionSnippet(latestSignal.snippet, input.language, 120),
+      at: latestSignal.at ?? input.targetSession?.latestHistoryAt ?? input.targetSession?.lastMessageAt,
+      tone: "ok",
+    });
+  }
+
+  if (steps.length === 0) {
+    steps.push({
+      id: `${input.sourceAgentId}:${input.targetAgentId}:fallback`,
+      agentId: input.targetAgentId,
+      roleLabel: pickUiText(input.language, "Receiving session", "接收会话"),
+      title: pickUiText(input.language, "Visible communication only", "仅有跨会话通信信号"),
+      detail: pickUiText(
+        input.language,
+        "The cross-session route is visible, but there is not enough recent text to summarize it yet.",
+        "当前能看到跨会话通信关系，但最近的文本还不够生成摘要。",
+      ),
+      at: pickLatestTimestamp([
+        input.sourceSession?.latestHistoryAt,
+        input.sourceSession?.lastMessageAt,
+        input.targetSession?.latestHistoryAt,
+        input.targetSession?.lastMessageAt,
+      ]),
+      tone: "warn",
+    });
+  }
+
+  return steps
+    .slice(0, 4)
+    .sort((a, b) => toSortableMs(a.at) - toSortableMs(b.at));
+}
+
+function normalizeAgentIdCandidate(value: string | undefined): string | undefined {
+  const normalized = normalizeLookupKey(value ?? "");
+  if (!normalized || normalized === "unassigned" || normalized === "未分配") return undefined;
+  return normalized;
+}
+
+function resolveCollaborationThreadStatus(card: TaskExecutionChainCard): CollaborationThreadStatus {
+  if (card.state === "blocked" || card.state === "waiting_approval" || card.state === "error") return "blocked";
+  if (card.state === "running" || card.executionChain.stage === "running") return "active";
+  if (card.executionChain.stage === "accepted") return "handoff";
+  return "completed";
+}
+
+function resolveCollaborationCurrentOwner(
+  card: TaskExecutionChainCard,
+  parentAgentId: string,
+  childAgentId: string,
+): string {
+  const status = resolveCollaborationThreadStatus(card);
+  if (status === "handoff") return childAgentId ?? parentAgentId;
+  if (status === "completed") return childAgentId ?? parentAgentId;
+  return childAgentId ?? parentAgentId;
+}
+
+function collaborationParticipantRoleLabel(
+  position: "parent" | "child",
+  language: UiLanguage = "zh",
+): string {
+  return position === "parent"
+    ? pickUiText(language, "Parent session", "父会话")
+    : pickUiText(language, "Child session", "子会话");
+}
+
+function collaborationRoleAgentLabel(
+  position: "parent" | "child",
+  agentId: string,
+  language: UiLanguage = "zh",
+): string {
+  const agentLabel = humanizeOperatorLabel(agentId);
+  return position === "parent"
+    ? pickUiText(language, `Parent ${agentLabel}`, `父会话 ${agentLabel}`)
+    : pickUiText(language, `Child ${agentLabel}`, `子会话 ${agentLabel}`);
+}
+
+function collaborationRouteLabel(
+  parentAgentId: string,
+  childAgentId: string,
+  hasChild: boolean,
+  language: UiLanguage = "zh",
+): string {
+  if (!hasChild) return collaborationRoleAgentLabel("parent", parentAgentId, language);
+  return `${collaborationRoleAgentLabel("parent", parentAgentId, language)} → ${collaborationRoleAgentLabel("child", childAgentId, language)}`;
+}
+
+function extractCollaborationTaskLabel(input: string, language: UiLanguage): string | undefined {
+  const normalized = normalizeInlineText(input);
+  if (!normalized) return undefined;
+
+  const explicitTaskMatch = /(?:任务|目标|task|objective)\s*[:：]\s*([^。；\n]+)/i.exec(normalized);
+  if (explicitTaskMatch?.[1]?.trim()) return safeTruncate(explicitTaskMatch[1].trim(), 88);
+
+  const cronTaskMatch = /^\[[^\]]+\s+([^\]\s][^\]]*?)\]\s/.exec(normalized);
+  if (cronTaskMatch?.[1]?.trim()) return safeTruncate(cronTaskMatch[1].trim(), 88);
+
+  const chineseBracketMatch = /^【([^】]+)】/.exec(normalized);
+  if (chineseBracketMatch?.[1]?.trim()) return safeTruncate(chineseBracketMatch[1].trim(), 88);
+
+  const firstClause = normalized
+    .split(/\s+[—-]\s+/)
+    .map((segment) => normalizeInlineText(segment))
+    .find((segment) => segment.length >= 4);
+  if (firstClause && !looksLikeStructuredExecutionTitle(firstClause)) return safeTruncate(firstClause, 88);
+
+  if (!looksLikeStructuredExecutionTitle(normalized)) return safeTruncate(normalized, 88);
+
+  const structuredSummary = summarizeStructuredSessionPayload(normalized, language);
+  if (structuredSummary?.trim()) return safeTruncate(structuredSummary, 88);
+
+  return undefined;
+}
+
+function deriveCollaborationTaskTitle(input: {
+  card: TaskExecutionChainCard;
+  parentSession?: SessionConversationListItem;
+  childSession?: SessionConversationListItem;
+  language: UiLanguage;
+}): string {
+  const mappedTitle = executionChainCardTitle(input.card, input.language);
+  const mappedLooksGeneric =
+    /隔离执行|关联任务|linked task|isolated execution|cron isolated run/i.test(mappedTitle) ||
+    /^(成功|失败|Succeeded|Failed)\b/.test(mappedTitle) ||
+    /(查询|成功|扫描|入选|发送|Queries|Successful|Scanned|Qualified|Sent)\s+\d+/i.test(mappedTitle);
+  if (!mappedLooksGeneric) return mappedTitle;
+
+  const candidates = [
+    input.childSession?.label,
+    input.parentSession?.label,
+    input.childSession?.taskSnippet,
+    input.parentSession?.taskSnippet,
+    input.childSession?.latestSnippet,
+    input.parentSession?.latestSnippet,
+    input.card.latestSnippet,
+    input.card.executionChain.detail,
+    input.card.taskTitle,
+  ];
+  for (const candidate of candidates) {
+    const derived = extractCollaborationTaskLabel(candidate ?? "", input.language);
+    if (derived?.trim()) return derived;
+  }
+
+  return mappedTitle;
+}
+
+function collaborationThreadStatusLabel(
+  status: CollaborationThreadStatus,
+  language: UiLanguage = "zh",
+): string {
+  if (status === "active") return pickUiText(language, "In progress", "进行中");
+  if (status === "handoff") return pickUiText(language, "Waiting handoff", "等待交接");
+  if (status === "blocked") return pickUiText(language, "Blocked", "卡住");
+  return pickUiText(language, "Completed", "已完成");
+}
+
+function collaborationStatusRank(status: CollaborationThreadStatus): number {
+  if (status === "active") return 4;
+  if (status === "blocked") return 3;
+  if (status === "handoff") return 2;
+  return 1;
+}
+
+function collaborationThreadSummary(input: {
+  card: TaskExecutionChainCard;
+  status: CollaborationThreadStatus;
+  parentAgentId: string;
+  childAgentId: string;
+  language: UiLanguage;
+}): string {
+  const parentLabel = collaborationRoleAgentLabel("parent", input.parentAgentId, input.language);
+  const childLabel = collaborationRoleAgentLabel("child", input.childAgentId, input.language);
+  if (input.status === "blocked") {
+    if (input.card.state === "waiting_approval") {
+      return pickUiText(
+        input.language,
+        `${childLabel} is waiting for approval before the handoff can continue.`,
+        `${childLabel} 正在等待审批，这条交接要等这一段通过后才能继续。`,
+      );
+    }
+    if (input.card.state === "error") {
+      return pickUiText(
+        input.language,
+        `${childLabel} hit an error after the latest handoff.`,
+        `${childLabel} 在最近一次交接后出现了错误。`,
+      );
+    }
+    return pickUiText(
+      input.language,
+      `${childLabel} is blocked and needs follow-up before the thread can move again.`,
+      `${childLabel} 当前卡住了，需要先跟进处理，这条协作线程才能继续。`,
+    );
+  }
+  if (input.status === "active") {
+    if (normalizeLookupKey(input.parentAgentId) !== normalizeLookupKey(input.childAgentId)) {
+      return pickUiText(
+        input.language,
+        `${childLabel} is working after ${parentLabel} handed the task over.`,
+        `${childLabel} 正在继续执行，前一步由 ${parentLabel} 完成交接。`,
+      );
+    }
+    return pickUiText(
+      input.language,
+      `${childLabel} is continuing the isolated run after ${parentLabel} opened it.`,
+      `${childLabel} 正在继续执行，前一步由 ${parentLabel} 在同一智能体里发起。`,
+    );
+  }
+  if (input.status === "handoff") {
+    if (normalizeLookupKey(input.parentAgentId) !== normalizeLookupKey(input.childAgentId)) {
+      return pickUiText(
+        input.language,
+        `${parentLabel} handed the task to ${childLabel}. The next visible reply has not arrived yet.`,
+        `${parentLabel} 已把任务交给 ${childLabel}，下一条可见回复还没有回来。`,
+      );
+    }
+    return pickUiText(
+      input.language,
+      `${parentLabel} opened a child run in the same agent. The next visible reply is still pending.`,
+      `${parentLabel} 已在同一智能体里发起子会话，但下一条可见回复还没出现。`,
+    );
+  }
+  if (normalizeLookupKey(input.parentAgentId) !== normalizeLookupKey(input.childAgentId)) {
+    return pickUiText(
+      input.language,
+      `${childLabel} finished the latest visible handoff from ${parentLabel}.`,
+      `${childLabel} 已完成最近一轮由 ${parentLabel} 交接过来的工作。`,
+    );
+  }
+  return pickUiText(
+    input.language,
+    `${childLabel} finished the latest visible isolated run after ${parentLabel} handed it off.`,
+    `${childLabel} 已完成最近一轮由 ${parentLabel} 发起的隔离执行。`,
+  );
+}
+
+function buildCollaborationTimelineSteps(input: {
+  card: TaskExecutionChainCard;
+  parentAgentId: string;
+  childAgentId: string;
+  parentSession?: SessionConversationListItem;
+  childSession?: SessionConversationListItem;
+  language: UiLanguage;
+}): CollaborationTimelineStep[] {
+  const steps: CollaborationTimelineStep[] = [];
+  const parentLabel = collaborationRoleAgentLabel("parent", input.parentAgentId, input.language);
+  const childLabel = collaborationRoleAgentLabel("child", input.childAgentId, input.language);
+  const chain = input.card.executionChain;
+
+  if (chain.accepted) {
+    steps.push({
+      id: `${input.card.sessionKey}:accepted`,
+      agentId: input.parentAgentId,
+      roleLabel: collaborationParticipantRoleLabel("parent", input.language),
+      title: pickUiText(input.language, "Parent accepted work", "父会话接到任务"),
+      detail: pickUiText(
+        input.language,
+        `${parentLabel} accepted the work in the parent session.`,
+        `${parentLabel} 在父会话里接下了这件事。`,
+      ),
+      at: chain.acceptedAt ?? input.parentSession?.latestHistoryAt ?? input.parentSession?.lastMessageAt,
+      tone: "info",
+    });
+  }
+
+  if (chain.spawned) {
+    steps.push({
+      id: `${input.card.sessionKey}:spawned`,
+      agentId: input.parentAgentId,
+      roleLabel: collaborationParticipantRoleLabel("parent", input.language),
+      title: pickUiText(input.language, "Parent opened child session", "父会话发起子会话"),
+      detail: normalizeLookupKey(input.parentAgentId) === normalizeLookupKey(input.childAgentId)
+        ? pickUiText(
+            input.language,
+            `${parentLabel} opened a child run in the same agent.`,
+            `${parentLabel} 在同一智能体里开了一条子会话来继续执行。`,
+          )
+        : pickUiText(
+            input.language,
+            `${parentLabel} handed the work to ${childLabel}.`,
+            `${parentLabel} 把这件事交给了 ${childLabel}。`,
+          ),
+      at: chain.spawnedAt ?? input.childSession?.latestHistoryAt ?? input.childSession?.lastMessageAt,
+      tone: "info",
+    });
+  }
+
+  if ((input.parentSession?.taskSnippet ?? input.parentSession?.latestSnippet)?.trim()) {
+    steps.push({
+      id: `${input.card.sessionKey}:parent-note`,
+      agentId: input.parentAgentId,
+      roleLabel: collaborationParticipantRoleLabel("parent", input.language),
+      title: pickUiText(input.language, "Parent session note", "父会话说明"),
+      detail: summarizeVisibleSessionSnippet(
+        input.parentSession?.taskSnippet ?? input.parentSession?.latestSnippet ?? "",
+        input.language,
+        120,
+      ),
+      at: input.parentSession.latestHistoryAt ?? input.parentSession.lastMessageAt,
+      tone: "ok",
+    });
+  }
+
+  if (input.childSession?.latestSnippet?.trim()) {
+    steps.push({
+      id: `${input.card.sessionKey}:child-note`,
+      agentId: input.childAgentId,
+      roleLabel: collaborationParticipantRoleLabel("child", input.language),
+      title: pickUiText(input.language, "Child session reply", "子会话最近回复"),
+      detail: summarizeVisibleSessionSnippet(input.childSession.latestSnippet, input.language, 120),
+      at: input.childSession.latestHistoryAt ?? input.childSession.lastMessageAt,
+      tone: input.card.state === "blocked" || input.card.state === "error" || input.card.state === "waiting_approval" ? "blocked" : "ok",
+    });
+  }
+
+  if (steps.length === 0) {
+    steps.push({
+      id: `${input.card.sessionKey}:fallback`,
+      agentId: input.childAgentId,
+      roleLabel: collaborationParticipantRoleLabel(
+        normalizeLookupKey(input.parentAgentId) === normalizeLookupKey(input.childAgentId) ? "parent" : "child",
+        input.language,
+      ),
+      title: pickUiText(input.language, "Visible chain only", "仅有执行链信号"),
+      detail: pickUiText(
+        input.language,
+        "The handoff relationship is visible, but there is not enough recent session text to summarize it yet.",
+        "当前能看到交接关系，但最近的会话文本还不够生成摘要。",
+      ),
+      at: input.card.latestAt,
+      tone: "warn",
+    });
+  }
+
+  return steps
+    .slice(0, 4)
+    .sort((a, b) => toSortableMs(a.at) - toSortableMs(b.at));
+}
+
+function renderCollaborationThreadCards(
+  cards: CollaborationThreadCard[],
+  language: UiLanguage = "zh",
+): string {
+  if (cards.length === 0) {
+    return `<div class="empty-state">${escapeHtml(
+      pickUiText(
+        language,
+        "No collaboration threads are visible yet. They will appear once parent-child relays or cross-session messages show up.",
+        "当前还没有可见的协作线程。父子接力或跨会话消息出现后，这里就会开始显示。",
+      ),
+    )}</div>`;
+  }
+
+  return `<div class="collaboration-thread-list">${cards
+    .map((card) => {
+      const participantAvatars = card.participants
+        .map((participant, index) => {
+          const avatar = `<div class="collaboration-participant">
+            <div class="agent-avatar collaboration-avatar${participant.current ? " is-current" : ""}" style="--agent-accent:${escapeHtml(participant.identity.accent)};" data-agent-id="${escapeHtml(participant.agentId)}" data-animal="${escapeHtml(participant.identity.animal)}" aria-label="${escapeHtml(participant.label)}">
+              <div class="agent-stage" aria-hidden="true">
+                <canvas class="agent-pixel-canvas" width="224" height="224"></canvas>
+              </div>
+            </div>
+            <div class="collaboration-participant-label">${escapeHtml(participant.roleLabel)}</div>
+          </div>`;
+          const arrow =
+            index < card.participants.length - 1
+              ? `<span class="collaboration-route-arrow" aria-hidden="true">${escapeHtml(card.routeJoiner)}</span>`
+              : "";
+          return `${avatar}${arrow}`;
+        })
+        .join("");
+      const timelineHtml = card.timeline
+        .map((step) => {
+          const identity = deriveAgentAnimalIdentity(step.agentId);
+          return `<li class="collaboration-timeline-step">
+            <div class="collaboration-agent-pill" style="--agent-accent:${escapeHtml(identity.accent)};">
+              <span class="collaboration-agent-pill-dot"></span>
+              <strong>${escapeHtml(step.roleLabel ? `${step.roleLabel} · ${humanizeOperatorLabel(step.agentId)}` : humanizeOperatorLabel(step.agentId))}</strong>
+            </div>
+            <div class="collaboration-step-copy">
+              <div class="collaboration-step-head">
+                <strong>${escapeHtml(step.title)}</strong>
+                <span>${escapeHtml(step.at ? formatTimeAgoFromNow(step.at, language) : pickUiText(language, "time unavailable", "时间未知"))}</span>
+              </div>
+              <div class="meta">${escapeHtml(step.detail)}</div>
+            </div>
+          </li>`;
+        })
+        .join("");
+      const technicalDetails = [
+        card.parentSessionKey
+          ? {
+              label:
+                card.kind === "inter_session"
+                  ? pickUiText(language, "Sending session", "发送会话")
+                  : pickUiText(language, "Parent session", "父会话"),
+              value: card.parentSessionKey,
+            }
+          : undefined,
+        card.childSessionKey
+          ? {
+              label:
+                card.kind === "inter_session"
+                  ? pickUiText(language, "Receiving session", "接收会话")
+                  : pickUiText(language, "Child session", "子会话"),
+              value: card.childSessionKey,
+            }
+          : undefined,
+      ]
+        .filter((item): item is { label: string; value: string } => Boolean(item?.value))
+        .filter((item, index, values) => values.findIndex((entry) => entry.value === item.value) === index)
+        .map((item) => `<li>${escapeHtml(item.label)}：<code>${escapeHtml(item.value)}</code></li>`)
+        .join("");
+      const foldedRunsList =
+        card.aggregateCount > 1
+          ? `<ul class="story-list collaboration-folded-list">${card.aggregateItems
+              .slice(0, 6)
+              .map(
+                (item) =>
+                  `<li><a href="${escapeHtml(item.sessionHref)}"><code>${escapeHtml(item.sessionKey)}</code></a> · ${escapeHtml(
+                    item.latestAt
+                      ? formatTimeAgoFromNow(item.latestAt, language)
+                      : pickUiText(language, "time unavailable", "时间未知"),
+                  )}</li>`,
+              )
+              .join("")}${
+                card.aggregateItems.length > 6
+                  ? `<li>${escapeHtml(
+                      pickUiText(
+                        language,
+                        `${card.aggregateItems.length - 6} more runs are folded here.`,
+                        `其余 ${card.aggregateItems.length - 6} 条相近协作也已经折叠在这里。`,
+                      ),
+                    )}</li>`
+                  : ""
+              }</ul>`
+          : "";
+      return `<details class="card collaboration-thread-card" data-collab-card data-collab-state="${escapeHtml(
+        card.status,
+      )}" data-collab-multi-agent="${card.multiAgent ? "1" : "0"}" data-collab-main-dispatched="${card.mainDispatched ? "1" : "0"}">
+        <summary class="collaboration-thread-summary">
+          <div class="collaboration-thread-head">
+            <div class="collaboration-route-avatars">${participantAvatars}</div>
+            <div class="collaboration-thread-copy">
+              <strong>${escapeHtml(card.taskTitle)}</strong>
+              <div class="meta">${escapeHtml(card.routeTitle)} · ${escapeHtml(card.latestAtLabel)}</div>
+            </div>
+            <div class="collaboration-thread-badges">
+              ${badge("idle", card.kindBadge)}
+              ${badge(card.status === "completed" ? "ok" : card.status === "blocked" ? "warn" : "info", card.statusBadge)}
+              ${
+                card.aggregateCount > 1
+                  ? badge("idle", pickUiText(language, `${card.aggregateCount} runs`, `${card.aggregateCount} 条`))
+                  : ""
+              }
+              <span class="collaboration-current-owner">${escapeHtml(card.currentOwnerLabel)}</span>
+            </div>
+          </div>
+          <div class="collaboration-thread-teaser">
+            <div class="meta">${escapeHtml(card.summary)}</div>
+            <div class="collaboration-latest-snippet">${escapeHtml(card.latestSnippet)}</div>
+          </div>
+        </summary>
+        <div class="collaboration-thread-body">
+          <ol class="collaboration-timeline">${timelineHtml}</ol>
+          ${
+            card.aggregateCount > 1
+              ? `<div class="meta collaboration-folded-note">${escapeHtml(
+                  card.kind === "inter_session"
+                    ? pickUiText(
+                        language,
+                        `${card.aggregateCount} similar cross-session exchanges are folded into this card. The newest timeline stays visible here.`,
+                        `这张卡里折叠了 ${card.aggregateCount} 条相近的跨会话通信，当前保留的是最新一条时间线。`,
+                      )
+                    : pickUiText(
+                        language,
+                        `${card.aggregateCount} similar parent-child relays are folded into this card. The newest timeline stays visible here.`,
+                        `这张卡里折叠了 ${card.aggregateCount} 条相近的父子会话接力，当前保留的是最新一条时间线。`,
+                      ),
+                )}</div>`
+              : ""
+          }
+          <div class="collaboration-thread-foot">
+            <div class="meta">${escapeHtml(card.sourceLabel)}</div>
+            <div class="collaboration-thread-actions">
+              <a class="btn" href="${escapeHtml(card.sessionHref)}">${escapeHtml(
+                pickUiText(language, "Open session", "查看会话"),
+              )}</a>
+              ${
+                card.taskHref
+                  ? `<a class="btn" href="${escapeHtml(card.taskHref)}">${escapeHtml(
+                      pickUiText(language, "Open task", "查看任务"),
+                    )}</a>`
+                  : ""
+              }
+            </div>
+          </div>
+          <details class="compact-table-details collaboration-technical-details">
+            <summary>${escapeHtml(pickUiText(language, "Technical details", "技术细节"))}</summary>
+            <div class="fold-body">
+              <ul class="story-list">${technicalDetails}</ul>
+              ${foldedRunsList}
+            </div>
+          </details>
+        </div>
+      </details>`;
+    })
+    .join("")}</div>`;
+}
+
 function renderOfficeCards(cards: OfficeSpaceCard[], language: UiLanguage = "zh"): string {
   if (cards.length === 0) {
     return `<div class="empty-state">${escapeHtml(
@@ -11258,6 +12884,66 @@ function renderNativeMotionScript(language: UiLanguage = "zh"): string {
       window.localStorage.setItem(storageKey, JSON.stringify(current));
     } catch {}
   }
+})();
+</script>`;
+}
+
+function renderCollaborationFilterScript(language: UiLanguage = "zh"): string {
+  return `<script>
+(() => {
+  const roots = Array.from(document.querySelectorAll('[data-collab-root]'));
+  if (roots.length === 0) return;
+
+  const copy = {
+    all: '${escapeHtml(pickUiText(language, "Showing all visible threads", "当前显示全部可见线程"))}',
+    active: '${escapeHtml(pickUiText(language, "Showing in-progress collaboration", "当前显示进行中的协作"))}',
+    blocked: '${escapeHtml(pickUiText(language, "Showing blocked collaboration", "当前显示卡住的协作"))}',
+    completed: '${escapeHtml(pickUiText(language, "Showing completed collaboration", "当前显示已完成的协作"))}',
+    multiAgent: '${escapeHtml(pickUiText(language, "Showing multi-agent collaboration only", "当前只看多智能体协作"))}',
+    mainDispatched: '${escapeHtml(pickUiText(language, "Showing collaboration dispatched by Main", "当前只看 Main 派发的协作"))}',
+  };
+
+  roots.forEach((root) => {
+    const buttons = Array.from(root.querySelectorAll('[data-collab-filter]'));
+    const cards = Array.from(root.querySelectorAll('[data-collab-card]'));
+    const stateNode = root.querySelector('[data-collab-filter-state]');
+    const apply = (mode) => {
+      buttons.forEach((button) => button.classList.toggle('active', (button.dataset.collabFilter || 'all') === mode));
+      cards.forEach((card) => {
+        const state = card.dataset.collabState || 'completed';
+        const multiAgent = card.dataset.collabMultiAgent === '1';
+        const mainDispatched = card.dataset.collabMainDispatched === '1';
+        const matches =
+          mode === 'all' ||
+          (mode === 'active' && (state === 'active' || state === 'handoff')) ||
+          (mode === 'blocked' && state === 'blocked') ||
+          (mode === 'completed' && state === 'completed') ||
+          (mode === 'multi-agent' && multiAgent) ||
+          (mode === 'main-dispatched' && mainDispatched);
+        card.hidden = !matches;
+      });
+      if (stateNode) {
+        stateNode.textContent =
+          mode === 'all'
+            ? copy.all
+            : mode === 'active'
+              ? copy.active
+              : mode === 'blocked'
+                ? copy.blocked
+                : mode === 'completed'
+                  ? copy.completed
+                  : mode === 'multi-agent'
+                    ? copy.multiAgent
+                    : copy.mainDispatched;
+      }
+    };
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => apply(button.dataset.collabFilter || 'all'));
+    });
+
+    apply('all');
+  });
 })();
 </script>`;
 }

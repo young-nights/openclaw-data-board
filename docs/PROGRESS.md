@@ -1,5 +1,32 @@
 # Progress
 
+## Phase 155 (Standalone collaboration page for agent handoffs) — Completed
+- Scope:
+  - Add a dedicated `Collaboration / 协作` page so users can inspect agent-to-agent handoffs without overloading `Staff` or `Tasks`.
+  - Keep the presentation Apple-native and readable: no extra drilldown page, no inner-card scrolling, and no raw payload dumps.
+- Changed files:
+  - `src/ui/server.ts`
+  - `test/ui-render-smoke.test.ts`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Added a first-class `collaboration` dashboard section and sidebar entry between `Staff` and `Memory`.
+  - Reused existing execution-chain/session evidence to build collaboration threads instead of inventing a second runtime model.
+  - Added collaboration summary metrics for active, waiting handoff, blocked, and completed-today threads.
+  - Built inline-expandable collaboration thread cards with:
+    - agent avatar chains
+    - current-owner status
+    - short human summaries
+    - a compact handoff timeline
+    - folded technical details for session keys
+  - Added lightweight client-side filters for all / in progress / blocked / completed / multi-agent / Main-dispatched views.
+  - Kept tool noise out of the default view so the page reads like collaboration history rather than backend logs.
+- Verification:
+  - `npm run build`
+  - `npm test`
+  - `npm run smoke:ui`
+- Remaining gap:
+  - V1 still derives collaboration threads from visible execution-chain evidence, so it is strongest for accepted/spawned parent-child flows and not yet a full free-form chat transcript browser.
+
 ## Phase 154 (Workspace root overrides and USER/TASKS doc discovery) — Completed
 - Scope:
   - Fix document and memory file discovery when control-center is installed outside the OpenClaw workspace tree.
