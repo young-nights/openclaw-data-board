@@ -1,5 +1,28 @@
 # Progress
 
+## Phase 156 (English-first README and official showcase prep) — Completed
+- Scope:
+  - Make the repository easier for OpenClaw maintainers and international users to understand at first glance.
+  - Keep Chinese users one click away instead of hiding or downgrading the Chinese landing page.
+  - Prepare copy-paste-ready outreach text for X and Discord showcase posts.
+- Changed files:
+  - `README.md`
+  - `README.zh-CN.md`
+  - `README.en.md`
+  - `docs/SHOWCASE.md`
+  - `docs/PROGRESS.md`
+- Implementation:
+  - Switched the root `README.md` to the full English landing page so the default GitHub homepage now opens in English.
+  - Restored the Chinese landing page as `README.zh-CN.md` and kept the language switch at the very top so Chinese readers do not get lost.
+  - Kept `README.en.md` as a compatibility entry pointing to the new English default, so older links do not break.
+  - Added `docs/SHOWCASE.md` with ready-to-post outreach copy for X, Discord `#showcase`, and Chinese audience sharing.
+  - Tightened the install examples so the repo clone step now uses the actual directory name: `openclaw-control-center`.
+- Verification:
+  - Manual README link/path review
+  - Manual showcase copy review
+- Remaining gap:
+  - GitHub repository topics / social preview still need to be adjusted through repo settings rather than source control.
+
 ## Phase 155 (Standalone collaboration page for agent handoffs) — Completed
 - Scope:
   - Add a dedicated `Collaboration / 协作` page so users can inspect agent-to-agent handoffs without overloading `Staff` or `Tasks`.
