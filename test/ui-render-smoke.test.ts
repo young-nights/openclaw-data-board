@@ -188,7 +188,7 @@ test("tasks section prioritizes schedule and cron before tracked task detail", a
   assert(source.includes('t("Today and next schedule", "今日与下一批排程")'));
   assert(source.includes('<section class="card" id="cron-execution-board">'));
   assert(source.includes('id="tracked-task-view"'));
-  assert(source.includes('const hasTrackedTaskPanels = tasks.length > 0 || pendingDecisionCount > 0 || taskCertaintyCards.length > 0;'));
+  assert(source.includes('const hasTrackedTaskPanels = tasks.length > 0 || pendingDecisionCount > 0 || trackedTaskCount > 0;'));
   assert(source.includes('t("Tracked tasks and follow-up", "跟踪任务与跟进")'));
   assert(source.includes("Start with schedule and cron execution. Staff can be active from cron or ad-hoc sessions even when there is no tracked task row yet."));
   assert(source.includes("先看排程和 Cron 执行。员工显示在工作，可能只是 Cron 或临时会话在跑，不一定已经落成可跟踪的任务条目。"));
@@ -324,8 +324,9 @@ test("dashboard keeps global visibility as overview-only block", async () => {
   const source = await readFile("src/ui/server.ts", "utf8");
   const usageSource = await readFile("src/runtime/usage-cost.ts", "utf8");
   assert(source.includes('data-ui-polish="apple-native-v3"'));
-  assert(source.includes("const globalVisibilityCard = renderGlobalVisibilityCard(globalVisibilityModel, options.language);"));
-  assert(source.includes("const globalVisibilityQuickRows = ["));
+  assert(source.includes("const globalVisibilityCard ="));
+  assert(source.includes("? renderGlobalVisibilityCard(globalVisibilityModel, options.language)"));
+  assert(source.includes("const globalVisibilityQuickRows = globalVisibilityModel"));
   assert(source.includes("const sidebarSignalRows ="));
   assert(
     source.includes(
@@ -366,13 +367,18 @@ test("dashboard keeps global visibility as overview-only block", async () => {
   assert(source.includes("loadCachedUsageCost(snapshot, usageCostMode)"));
   assert(source.includes("loadCachedOfficeSessionPresence()"));
   assert(source.includes("loadCachedTaskEvidenceSessions("));
-  assert(source.includes("const taskSignalItems = mergeSessionConversationItems(taskEvidenceItems, sessionPreview.items);"));
+  assert(source.includes("const taskSignalItems = needsCollaborationThreads"));
+  assert(source.includes("? collaborationPreview.items"));
+  assert(source.includes(": mergeSessionConversationItems(taskEvidenceItems, sessionPreview.items);"));
+  assert(source.includes("const collaborationSessionKeys = needsCollaborationThreads"));
+  assert(source.includes("collectCollaborationEvidenceSessionKeys(collaborationPreview.items)"));
+  assert(source.includes("const taskExecutionChainCards = buildTaskExecutionChainCards({"));
   assert(source.includes("const liveSessionCount = officePresence.totalActiveSessions;"));
   assert(source.includes("buildTaskDetailHref(task.taskId, input.language)"));
   assert(source.includes('const language = resolveUiLanguage(url.searchParams, "zh");'));
   assert(source.includes('buildUsageCostSnapshot(snapshot, mode)'));
   assert(source.includes('const needsSessionPreview ='));
-  assert(source.includes('activeSection === "overview" || activeSection === "collaboration";'));
+  assert(source.includes('const needsSessionPreview = activeSection === "projects-tasks" || activeSection === "overview";'));
   assert(source.includes("const allApprovals = [...(snapshot.approvals ?? [])].sort(compareApprovals);"));
   assert(source.includes('const pendingApprovalsCount = allApprovals.filter((item) => item.status === "pending").length;'));
   assert(source.includes("replayPreview.stats.timeline.total"));

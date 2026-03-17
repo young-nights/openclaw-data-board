@@ -174,6 +174,16 @@ const MAX_ENTRY_CONTENT_CHARS = 1200;
 const MAX_SNIPPET_CHARS = 220;
 const MAX_TOOL_SEGMENT_CHARS = 280;
 const KNOWN_ROLE_TYPES = new Set(["user", "assistant", "system", "tool"]);
+const SESSION_HISTORY_CACHE_TTL_MS = 15_000;
+
+interface SessionHistoryCacheEntry {
+  limit: number;
+  expiresAt: number;
+  value?: SessionHistoryReadResult;
+  inflight?: Promise<SessionHistoryReadResult>;
+}
+
+const sessionHistoryCache = new Map<string, SessionHistoryCacheEntry>();
 
 export async function listSessionConversations(
   input: SessionConversationListInput,
@@ -260,17 +270,60 @@ async function readSessionHistory(
   sessionKey: string,
   limit: number,
 ): Promise<SessionHistoryReadResult> {
-  try {
-    const response = await client.sessionsHistory({ sessionKey, limit });
-    return {
-      messages: normalizeHistoryMessages(response, limit),
-    };
-  } catch (error) {
-    return {
-      messages: [],
-      error: error instanceof Error ? error.message : "Failed to read session history.",
-    };
+  const cacheKey = sessionKey.trim();
+  const now = Date.now();
+  const cached = sessionHistoryCache.get(cacheKey);
+  if (cached && cached.expiresAt > now && cached.value && cached.limit >= limit) {
+    return sliceHistoryReadResult(cached.value, limit);
   }
+
+  if (cached?.inflight) {
+    const inflightResult = await cached.inflight;
+    const refreshed = sessionHistoryCache.get(cacheKey);
+    if (refreshed && refreshed.expiresAt > Date.now() && refreshed.value && refreshed.limit >= limit) {
+      return sliceHistoryReadResult(refreshed.value, limit);
+    }
+    if (cached.limit >= limit) {
+      return sliceHistoryReadResult(inflightResult, limit);
+    }
+  }
+
+  const fetchLimit = Math.max(limit, cached?.limit ?? 0);
+  const inflight = (async (): Promise<SessionHistoryReadResult> => {
+    try {
+      const response = await client.sessionsHistory({ sessionKey, limit: fetchLimit });
+      return {
+        messages: normalizeHistoryMessages(response, fetchLimit),
+      };
+    } catch (error) {
+      return {
+        messages: [],
+        error: error instanceof Error ? error.message : "Failed to read session history.",
+      };
+    }
+  })();
+
+  sessionHistoryCache.set(cacheKey, {
+    limit: fetchLimit,
+    expiresAt: now + SESSION_HISTORY_CACHE_TTL_MS,
+    inflight,
+  });
+
+  const value = await inflight;
+  sessionHistoryCache.set(cacheKey, {
+    limit: fetchLimit,
+    expiresAt: Date.now() + SESSION_HISTORY_CACHE_TTL_MS,
+    value,
+  });
+  return sliceHistoryReadResult(value, limit);
+}
+
+function sliceHistoryReadResult(result: SessionHistoryReadResult, limit: number): SessionHistoryReadResult {
+  if (result.messages.length <= limit) return result;
+  return {
+    messages: result.messages.slice(-limit),
+    error: result.error,
+  };
 }
 
 function normalizeHistoryMessages(response: SessionsHistoryResponse, limit: number): SessionHistoryMessage[] {

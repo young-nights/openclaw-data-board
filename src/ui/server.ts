@@ -169,6 +169,9 @@ const HTML_USAGE_CACHE_TTL_MS = 10_000;
 const HTML_SNAPSHOT_CACHE_TTL_MS = 10_000;
 const HTML_LIVE_SESSIONS_CACHE_TTL_MS = POLLING_INTERVALS_MS.sessionsList;
 const HTML_REPLAY_CACHE_TTL_MS = 10_000;
+const COLLABORATION_PREVIEW_PAGE_SIZE = 8;
+const COLLABORATION_PREVIEW_HISTORY_LIMIT = 3;
+const COLLABORATION_EVIDENCE_HISTORY_LIMIT = 6;
 const JSON_MAX_BYTES = 128 * 1024;
 const FORM_MAX_BYTES = 16 * 1024;
 const EDITABLE_TEXT_FILE_MAX_BYTES = 1024 * 1024;
@@ -539,10 +542,16 @@ interface EditableAgentScope {
 type EditableAgentScopeConfigStatus = "configured" | "config_missing" | "config_invalid";
 
 let renderSessionPreviewCache:
-  | { snapshotAt: string; value: SessionConversationListResult; expiresAt: number }
+  | { snapshotKey: string; value: SessionConversationListResult; expiresAt: number }
   | undefined;
 let renderCollaborationPreviewCache:
-  | { snapshotAt: string; value: SessionConversationListResult; expiresAt: number }
+  | { snapshotKey: string; value: SessionConversationListResult; expiresAt: number }
+  | undefined;
+let renderCollaborationPreviewInFlight:
+  | {
+      snapshotKey: string;
+      value: Promise<SessionConversationListResult>;
+    }
   | undefined;
 let renderUsageCostSummaryCache:
   | { snapshotKey: string; value: UsageCostSnapshot; expiresAt: number }
@@ -570,11 +579,19 @@ let renderStaffRecentActivityCache:
   | undefined;
 let renderTaskEvidenceCache:
   | {
-      snapshotAt: string;
+      snapshotKey: string;
       historyLimit: number;
       sessionKey: string;
       value: SessionConversationListItem[];
       expiresAt: number;
+    }
+  | undefined;
+let renderTaskEvidenceInFlight:
+  | {
+      snapshotKey: string;
+      historyLimit: number;
+      sessionKey: string;
+      value: Promise<SessionConversationListItem[]>;
     }
   | undefined;
 let renderSnapshotCache:
@@ -4289,10 +4306,15 @@ async function loadCachedTaskEvidenceSessions(
 ): Promise<SessionConversationListItem[]> {
   const normalizedKeys = [...new Set(sessionKeys.map((item) => item.trim()).filter(Boolean))].sort();
   const cacheKey = normalizedKeys.join(",");
+  const snapshotKey = buildConversationSnapshotKey({
+    snapshot,
+    sessionKeys: normalizedKeys,
+    historyLimit,
+  });
   const now = Date.now();
   if (
     renderTaskEvidenceCache &&
-    renderTaskEvidenceCache.snapshotAt === snapshot.generatedAt &&
+    renderTaskEvidenceCache.snapshotKey === snapshotKey &&
     renderTaskEvidenceCache.historyLimit === historyLimit &&
     renderTaskEvidenceCache.sessionKey === cacheKey &&
     renderTaskEvidenceCache.expiresAt > now
@@ -4300,22 +4322,94 @@ async function loadCachedTaskEvidenceSessions(
     return renderTaskEvidenceCache.value;
   }
 
-  const value = await loadSessionConversationItemsByKeys(snapshot, toolClient, normalizedKeys, historyLimit);
-  renderTaskEvidenceCache = {
-    snapshotAt: snapshot.generatedAt,
+  if (
+    renderTaskEvidenceCache &&
+    renderTaskEvidenceCache.historyLimit === historyLimit &&
+    renderTaskEvidenceCache.sessionKey === cacheKey
+  ) {
+    if (
+      !renderTaskEvidenceInFlight ||
+      renderTaskEvidenceInFlight.snapshotKey !== snapshotKey ||
+      renderTaskEvidenceInFlight.historyLimit !== historyLimit ||
+      renderTaskEvidenceInFlight.sessionKey !== cacheKey
+    ) {
+      const nextValue = loadSessionConversationItemsByKeys(snapshot, toolClient, normalizedKeys, historyLimit);
+      renderTaskEvidenceInFlight = {
+        snapshotKey,
+        historyLimit,
+        sessionKey: cacheKey,
+        value: nextValue,
+      };
+      void nextValue
+        .then((value) => {
+          renderTaskEvidenceCache = {
+            snapshotKey,
+            historyLimit,
+            sessionKey: cacheKey,
+            value,
+            expiresAt: Date.now() + HTML_HEAVY_CACHE_TTL_MS,
+          };
+        })
+        .finally(() => {
+          if (
+            renderTaskEvidenceInFlight?.snapshotKey === snapshotKey &&
+            renderTaskEvidenceInFlight.historyLimit === historyLimit &&
+            renderTaskEvidenceInFlight.sessionKey === cacheKey
+          ) {
+            renderTaskEvidenceInFlight = undefined;
+          }
+        });
+    }
+    return renderTaskEvidenceCache.value;
+  }
+
+  if (
+    renderTaskEvidenceInFlight &&
+    renderTaskEvidenceInFlight.snapshotKey === snapshotKey &&
+    renderTaskEvidenceInFlight.historyLimit === historyLimit &&
+    renderTaskEvidenceInFlight.sessionKey === cacheKey
+  ) {
+    return renderTaskEvidenceInFlight.value;
+  }
+
+  const nextValue = loadSessionConversationItemsByKeys(snapshot, toolClient, normalizedKeys, historyLimit);
+  renderTaskEvidenceInFlight = {
+    snapshotKey,
     historyLimit,
     sessionKey: cacheKey,
-    value,
-    expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
+    value: nextValue,
   };
-  return value;
+  try {
+    const value = await nextValue;
+    renderTaskEvidenceCache = {
+      snapshotKey,
+      historyLimit,
+      sessionKey: cacheKey,
+      value,
+      expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
+    };
+    return value;
+  } finally {
+    if (
+      renderTaskEvidenceInFlight?.snapshotKey === snapshotKey &&
+      renderTaskEvidenceInFlight.historyLimit === historyLimit &&
+      renderTaskEvidenceInFlight.sessionKey === cacheKey
+    ) {
+      renderTaskEvidenceInFlight = undefined;
+    }
+  }
 }
 
 async function loadCachedSessionPreview(snapshot: ReadModelSnapshot, toolClient: ToolClient): Promise<SessionConversationListResult> {
+  const snapshotKey = buildConversationSnapshotKey({
+    snapshot,
+    pageSize: 12,
+    historyLimit: 5,
+  });
   const now = Date.now();
   if (
     renderSessionPreviewCache &&
-    renderSessionPreviewCache.snapshotAt === snapshot.generatedAt &&
+    renderSessionPreviewCache.snapshotKey === snapshotKey &&
     renderSessionPreviewCache.expiresAt > now
   ) {
     return renderSessionPreviewCache.value;
@@ -4330,7 +4424,7 @@ async function loadCachedSessionPreview(snapshot: ReadModelSnapshot, toolClient:
     historyLimit: 5,
   });
   renderSessionPreviewCache = {
-    snapshotAt: snapshot.generatedAt,
+    snapshotKey,
     value,
     expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
   };
@@ -4341,29 +4435,80 @@ async function loadCachedCollaborationPreview(
   snapshot: ReadModelSnapshot,
   toolClient: ToolClient,
 ): Promise<SessionConversationListResult> {
+  const snapshotKey = buildConversationSnapshotKey({
+    snapshot,
+    pageSize: COLLABORATION_PREVIEW_PAGE_SIZE,
+    historyLimit: COLLABORATION_PREVIEW_HISTORY_LIMIT,
+  });
   const now = Date.now();
   if (
     renderCollaborationPreviewCache &&
-    renderCollaborationPreviewCache.snapshotAt === snapshot.generatedAt &&
+    renderCollaborationPreviewCache.snapshotKey === snapshotKey &&
     renderCollaborationPreviewCache.expiresAt > now
   ) {
     return renderCollaborationPreviewCache.value;
   }
 
-  const value = await listSessionConversations({
+  if (renderCollaborationPreviewCache) {
+    if (!renderCollaborationPreviewInFlight || renderCollaborationPreviewInFlight.snapshotKey !== snapshotKey) {
+      const nextValue = listSessionConversations({
+        snapshot,
+        client: toolClient,
+        filters: {},
+        page: 1,
+        pageSize: COLLABORATION_PREVIEW_PAGE_SIZE,
+        historyLimit: COLLABORATION_PREVIEW_HISTORY_LIMIT,
+      });
+      renderCollaborationPreviewInFlight = {
+        snapshotKey,
+        value: nextValue,
+      };
+      void nextValue
+        .then((value) => {
+          renderCollaborationPreviewCache = {
+            snapshotKey,
+            value,
+            expiresAt: Date.now() + HTML_HEAVY_CACHE_TTL_MS,
+          };
+        })
+        .finally(() => {
+          if (renderCollaborationPreviewInFlight?.snapshotKey === snapshotKey) {
+            renderCollaborationPreviewInFlight = undefined;
+          }
+        });
+    }
+    return renderCollaborationPreviewCache.value;
+  }
+
+  if (renderCollaborationPreviewInFlight?.snapshotKey === snapshotKey) {
+    return renderCollaborationPreviewInFlight.value;
+  }
+
+  const nextValue = listSessionConversations({
     snapshot,
     client: toolClient,
     filters: {},
     page: 1,
-    pageSize: 40,
-    historyLimit: 8,
+    pageSize: COLLABORATION_PREVIEW_PAGE_SIZE,
+    historyLimit: COLLABORATION_PREVIEW_HISTORY_LIMIT,
   });
-  renderCollaborationPreviewCache = {
-    snapshotAt: snapshot.generatedAt,
-    value,
-    expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
+  renderCollaborationPreviewInFlight = {
+    snapshotKey,
+    value: nextValue,
   };
-  return value;
+  try {
+    const value = await nextValue;
+    renderCollaborationPreviewCache = {
+      snapshotKey,
+      value,
+      expiresAt: now + HTML_HEAVY_CACHE_TTL_MS,
+    };
+    return value;
+  } finally {
+    if (renderCollaborationPreviewInFlight?.snapshotKey === snapshotKey) {
+      renderCollaborationPreviewInFlight = undefined;
+    }
+  }
 }
 
 function buildUsageCostCacheKey(snapshot: ReadModelSnapshot, mode: UsageCostMode): string {
@@ -4380,6 +4525,38 @@ function buildUsageCostCacheKey(snapshot: ReadModelSnapshot, mode: UsageCostMode
     .sort()
     .join(";");
   return `${mode}|${sessionFingerprint}|${statusFingerprint}`;
+}
+
+function buildConversationSnapshotKey(input: {
+  snapshot: ReadModelSnapshot;
+  sessionKeys?: string[];
+  pageSize?: number;
+  historyLimit?: number;
+}): string {
+  const { snapshot, sessionKeys, pageSize, historyLimit } = input;
+  const explicitKeys = sessionKeys?.map((item) => item.trim()).filter(Boolean);
+  const scopedSessions =
+    explicitKeys && explicitKeys.length > 0
+      ? snapshot.sessions.filter((session) => explicitKeys.includes(session.sessionKey))
+      : [...snapshot.sessions]
+          .sort((a, b) => {
+            const aTs = toSortableMs(a.lastMessageAt);
+            const bTs = toSortableMs(b.lastMessageAt);
+            if (aTs !== bTs) return bTs - aTs;
+            return a.sessionKey.localeCompare(b.sessionKey);
+          })
+          .slice(0, pageSize ?? snapshot.sessions.length);
+  const relevantSessionKeys = scopedSessions.map((session) => session.sessionKey);
+  const sessionFingerprint = scopedSessions
+    .map((session) => `${session.sessionKey}:${session.state}:${session.lastMessageAt ?? ""}`)
+    .sort()
+    .join(";");
+  const statusFingerprint = snapshot.statuses
+    .filter((status) => relevantSessionKeys.includes(status.sessionKey))
+    .map((status) => `${status.sessionKey}:${status.updatedAt}`)
+    .sort()
+    .join(";");
+  return `${pageSize ?? 0}|${historyLimit ?? 0}|${sessionFingerprint}|${statusFingerprint}`;
 }
 
 async function loadCachedUsageCost(
@@ -4582,9 +4759,8 @@ async function renderHtml(
             "先看排程和 Cron 执行。员工显示在工作，可能只是 Cron 或临时会话在跑，不一定已经落成可跟踪的任务条目。",
           )
         : sectionMeta.blurb;
-  const needsSessionPreview =
-    activeSection === "projects-tasks" || activeSection === "overview" || activeSection === "collaboration";
-  const needsTaskEvidence = activeSection === "projects-tasks" || activeSection === "collaboration";
+  const needsSessionPreview = activeSection === "projects-tasks" || activeSection === "overview";
+  const needsTaskEvidence = activeSection === "projects-tasks";
   const needsTeamSnapshot = activeSection === "team";
   const needsMemoryFiles = activeSection === "memory";
   const needsWorkspaceFiles = activeSection === "docs";
@@ -4593,6 +4769,9 @@ async function renderHtml(
   const needsUpdateSummary = activeSection === "settings";
   const needsMemoryState = activeSection === "memory";
   const needsCollaborationThreads = activeSection === "collaboration";
+  const needsTaskCertainty = activeSection === "overview" || activeSection === "projects-tasks";
+  const needsGlobalVisibility = activeSection === "overview";
+  const needsExecutionChainPresentation = activeSection === "overview" || activeSection === "projects-tasks";
   markRenderPhase("snapshot");
   const exceptions = commanderExceptions(snapshot);
   const exceptionsFeed = commanderExceptionsFeed(snapshot);
@@ -4692,29 +4871,38 @@ async function renderHtml(
     officeRoster.entries,
     usageAgentTokensByKey,
   );
-  const taskSignalItems = mergeSessionConversationItems(taskEvidenceItems, sessionPreview.items);
-  const taskExecutionChainCards = buildTaskExecutionChainCards({
-    tasks: realTasks,
-    sessions: snapshot.sessions,
-    sessionItems: taskSignalItems,
-    language: options.language,
-  });
+  const collaborationPreviewSessionKeys = new Set(
+    collaborationPreview.items.map((item) => item.sessionKey.trim()).filter(Boolean),
+  );
+  const collaborationScopedTasks = needsCollaborationThreads
+    ? realTasks.filter((task) => task.sessionKeys.some((sessionKey) => collaborationPreviewSessionKeys.has(sessionKey.trim())))
+    : realTasks;
+  const taskSignalItems = needsCollaborationThreads
+    ? collaborationPreview.items
+    : mergeSessionConversationItems(taskEvidenceItems, sessionPreview.items);
   const collaborationSessionKeys = needsCollaborationThreads
-    ? [...new Set(
-        taskExecutionChainCards
-          .flatMap((item) => [item.sessionKey, item.executionChain.parentSessionKey, item.executionChain.childSessionKey])
-          .map((value) => value?.trim() ?? "")
-          .filter(Boolean),
-      )]
+    ? collectCollaborationEvidenceSessionKeys(collaborationPreview.items)
     : [];
   const collaborationEvidenceItems =
     needsCollaborationThreads && collaborationSessionKeys.length > 0
-      ? await loadCachedTaskEvidenceSessions(snapshot, toolClient, collaborationSessionKeys, 40)
+      ? await loadCachedTaskEvidenceSessions(
+          snapshot,
+          toolClient,
+          collaborationSessionKeys,
+          COLLABORATION_EVIDENCE_HISTORY_LIMIT,
+        )
       : [];
   const collaborationSignalItems = mergeSessionConversationItems(
     collaborationEvidenceItems,
     mergeSessionConversationItems(taskSignalItems, collaborationPreview.items),
   );
+  const taskExecutionChainCards = buildTaskExecutionChainCards({
+    tasks: collaborationScopedTasks,
+    sessions: snapshot.sessions,
+    sessionItems: needsCollaborationThreads ? collaborationSignalItems : taskSignalItems,
+    language: options.language,
+    includeSnapshotUnmappedSessions: !needsCollaborationThreads,
+  });
   const collaborationThreadCards = needsCollaborationThreads
     ? mergeCollaborationThreadCards(
         buildCollaborationThreadCards({
@@ -4728,20 +4916,31 @@ async function renderHtml(
         }),
       )
     : [];
-  const taskCertaintyCards = buildTaskCertaintyCards({
-    tasks,
-    sessions: snapshot.sessions,
-    sessionItems: taskSignalItems,
-    approvals: snapshot.approvals,
-    language: options.language,
-  });
+  const trackedTaskCount = tasks.filter((task) => task.status !== "done").length;
+  const taskCertaintyCards = needsTaskCertainty
+    ? buildTaskCertaintyCards({
+        tasks,
+        sessions: snapshot.sessions,
+        sessionItems: taskSignalItems,
+        approvals: snapshot.approvals,
+        language: options.language,
+      })
+    : [];
   const taskCertaintyStrongCount = taskCertaintyCards.filter((item) => item.tone === "ok").length;
   const taskCertaintyFollowupCount = taskCertaintyCards.filter((item) => item.tone === "warn").length;
   const taskCertaintyWeakCount = taskCertaintyCards.filter((item) => item.tone === "blocked").length;
-  const spawnedExecutionChainCount = taskExecutionChainCards.filter((item) => item.executionChain.spawned).length;
-  const runningExecutionChainCount = taskExecutionChainCards.filter((item) => item.executionChain.stage === "running").length;
-  const mappedExecutionChainCount = taskExecutionChainCards.filter((item) => !item.unmapped).length;
-  const taskExecutionChainHtml = renderTaskExecutionChainCards(taskExecutionChainCards, options.language);
+  const spawnedExecutionChainCount = needsExecutionChainPresentation
+    ? taskExecutionChainCards.filter((item) => item.executionChain.spawned).length
+    : 0;
+  const runningExecutionChainCount = needsExecutionChainPresentation
+    ? taskExecutionChainCards.filter((item) => item.executionChain.stage === "running").length
+    : 0;
+  const mappedExecutionChainCount = needsExecutionChainPresentation
+    ? taskExecutionChainCards.filter((item) => !item.unmapped).length
+    : 0;
+  const taskExecutionChainHtml = needsExecutionChainPresentation
+    ? renderTaskExecutionChainCards(taskExecutionChainCards, options.language)
+    : "";
   const collaborationThreadHtml = renderCollaborationThreadCards(collaborationThreadCards, options.language);
   const collaborationThreadVisibleCount = collaborationThreadCards.length;
   const collaborationThreadTotalCount = collaborationThreadCards.reduce((sum, item) => sum + item.aggregateCount, 0);
@@ -4776,14 +4975,16 @@ async function renderHtml(
   const runtimeSessionIssueCount = sessionBlockedCount + sessionErrorCount + sessionWaitingApprovalCount;
   const stalledRunningSessionCount = countStalledRunningSessions(snapshot.sessions, taskSignalItems, nowMs);
   const runtimeIssueCount = runtimeSessionIssueCount + stalledRunningSessionCount;
-  const globalVisibilityModel = await buildGlobalVisibilityViewModel(snapshot, toolClient, options.language, {
-    cronOverview,
-    openclawCronJobs,
-    currentTasksCount: taskCertaintyCards.length,
-    strongTaskEvidenceCount: taskCertaintyStrongCount,
-    followupTaskEvidenceCount: taskCertaintyFollowupCount,
-    weakTaskEvidenceCount: taskCertaintyWeakCount,
-  });
+  const globalVisibilityModel = needsGlobalVisibility
+    ? await buildGlobalVisibilityViewModel(snapshot, toolClient, options.language, {
+        cronOverview,
+        openclawCronJobs,
+        currentTasksCount: trackedTaskCount,
+        strongTaskEvidenceCount: taskCertaintyStrongCount,
+        followupTaskEvidenceCount: taskCertaintyFollowupCount,
+        weakTaskEvidenceCount: taskCertaintyWeakCount,
+      })
+    : undefined;
   const attentionCount = actionQueue.counts.unacked + runtimeIssueCount + nonOkBudgets.length;
   const replayMoments = replayPreview.timeline.entries.slice(0, 8);
   const replaySignals = [
@@ -5093,7 +5294,7 @@ async function renderHtml(
   const clearHref = buildHomeHref({ quick: "all" }, options.compactStatusStrip, options.section, options.language, options.usageView);
   const signalItems = [
     { label: t("Active sessions", "活跃会话"), value: liveSessionCount },
-    { label: t("Tasks under watch", "正在观察中的任务"), value: taskCertaintyCards.length },
+    { label: t("Tasks under watch", "正在观察中的任务"), value: trackedTaskCount },
     { label: t("Risk signals", "风险信号"), value: attentionCount },
     { label: t("Active projects", "活跃项目"), value: snapshot.projectSummaries.filter((item) => item.status === "active").length },
   ].filter((item) => item.value > 0);
@@ -6173,12 +6374,12 @@ async function renderHtml(
     </details>
   `;
   const teamUnifiedSection = teamSection;
-  const hasTrackedTaskPanels = tasks.length > 0 || pendingDecisionCount > 0 || taskCertaintyCards.length > 0;
-  const trackedTaskDetailsOpen = pendingDecisionCount > 0 || taskCertaintyCards.length > 0;
+  const hasTrackedTaskPanels = tasks.length > 0 || pendingDecisionCount > 0 || trackedTaskCount > 0;
+  const trackedTaskDetailsOpen = pendingDecisionCount > 0 || trackedTaskCount > 0;
   const trackedTaskSummaryText = hasTrackedTaskPanels
     ? t(
-        `Tracked tasks ${taskCertaintyCards.length} · Follow-up ${pendingDecisionCount}`,
-        `跟踪任务 ${taskCertaintyCards.length} · 待处理 ${pendingDecisionCount}`,
+        `Tracked tasks ${trackedTaskCount} · Follow-up ${pendingDecisionCount}`,
+        `跟踪任务 ${trackedTaskCount} · 待处理 ${pendingDecisionCount}`,
       )
     : t("No tracked task rows yet", "还没有跟踪任务条目");
   const trackedTaskExplanation = hasTrackedTaskPanels
@@ -6422,32 +6623,35 @@ async function renderHtml(
   if (options.section === "alerts") sectionBody = alertsSection;
   if (options.section === "replay-audit") sectionBody = replaySection;
   if (options.section === "settings") sectionBody = settingsSection;
-  const globalVisibilityCard = renderGlobalVisibilityCard(globalVisibilityModel, options.language);
+  const globalVisibilityCard =
+    globalVisibilityModel ? renderGlobalVisibilityCard(globalVisibilityModel, options.language) : "";
   const globalVisibilityBlock = options.section === "overview" ? globalVisibilityCard : "";
-  const globalVisibilityQuickRows = [
-    {
-      label: pickUiText(options.language, "Timed jobs", "定时任务"),
-      count: globalVisibilityModel.signalCounts.schedule,
-      href: buildGlobalVisibilityDetailHref("cron", options.language),
-    },
-    {
-      label: pickUiText(options.language, "Heartbeat", "任务心跳"),
-      count: globalVisibilityModel.signalCounts.heartbeat,
-      href: buildGlobalVisibilityDetailHref("heartbeat", options.language),
-    },
-    {
-      label: pickUiText(options.language, "Current tasks", "当前任务"),
-      count: globalVisibilityModel.signalCounts.currentTasks,
-      href: buildGlobalVisibilityDetailHref("current_task", options.language),
-    },
-    {
-      label: pickUiText(options.language, "Tool calls", "工具调用"),
-      count: globalVisibilityModel.signalCounts.toolCalls,
-      href: buildGlobalVisibilityDetailHref("tool_call", options.language),
-    },
-  ]
-    .map((item) => `<div class="meta"><a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>：${item.count}</div>`)
-    .join("");
+  const globalVisibilityQuickRows = globalVisibilityModel
+    ? [
+        {
+          label: pickUiText(options.language, "Timed jobs", "定时任务"),
+          count: globalVisibilityModel.signalCounts.schedule,
+          href: buildGlobalVisibilityDetailHref("cron", options.language),
+        },
+        {
+          label: pickUiText(options.language, "Heartbeat", "任务心跳"),
+          count: globalVisibilityModel.signalCounts.heartbeat,
+          href: buildGlobalVisibilityDetailHref("heartbeat", options.language),
+        },
+        {
+          label: pickUiText(options.language, "Current tasks", "当前任务"),
+          count: globalVisibilityModel.signalCounts.currentTasks,
+          href: buildGlobalVisibilityDetailHref("current_task", options.language),
+        },
+        {
+          label: pickUiText(options.language, "Tool calls", "工具调用"),
+          count: globalVisibilityModel.signalCounts.toolCalls,
+          href: buildGlobalVisibilityDetailHref("tool_call", options.language),
+        },
+      ]
+        .map((item) => `<div class="meta"><a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>：${item.count}</div>`)
+        .join("")
+    : "";
   const sidebarSignalRows =
     options.section === "overview"
       ? globalVisibilityQuickRows
@@ -9700,7 +9904,7 @@ async function renderHtml(
       <div class="card">
         <h2>${escapeHtml(t("Current status", "当前状态"))}</h2>
         <div class="meta">${escapeHtml(t("Active sessions", "活跃会话"))}：${liveSessionCount}</div>
-        <div class="meta">${escapeHtml(t("Tasks under watch", "正在观察中的任务"))}：${taskCertaintyCards.length}</div>
+        <div class="meta">${escapeHtml(t("Tasks under watch", "正在观察中的任务"))}：${trackedTaskCount}</div>
         <div class="meta">${escapeHtml(t("Review queue", "审阅队列"))}：${pendingDecisionCount}</div>
         ${sidebarSignalRows}
       </div>
@@ -12210,6 +12414,7 @@ function buildTaskExecutionChainCards(input: {
   sessions: ReadModelSnapshot["sessions"];
   sessionItems: SessionConversationListItem[];
   language: UiLanguage;
+  includeSnapshotUnmappedSessions?: boolean;
 }): TaskExecutionChainCard[] {
   type SessionLike = {
     sessionKey: string;
@@ -12287,9 +12492,11 @@ function buildTaskExecutionChainCards(input: {
     ...input.sessionItems
       .map((item) => resolveCandidate(item.sessionKey))
       .filter((item): item is TaskExecutionChainCard => Boolean(item)),
-    ...input.sessions
-      .map((session) => resolveCandidate(session.sessionKey))
-      .filter((item): item is TaskExecutionChainCard => Boolean(item)),
+    ...(input.includeSnapshotUnmappedSessions === false
+      ? []
+      : input.sessions
+          .map((session) => resolveCandidate(session.sessionKey))
+          .filter((item): item is TaskExecutionChainCard => Boolean(item))),
   ];
   const dedupedUnmapped = new Map<string, TaskExecutionChainCard>();
   for (const item of unmappedSessions) {
@@ -13058,6 +13265,23 @@ function mergeCollaborationThreadCards(
     if (a.kind !== b.kind) return a.kind === "inter_session" ? -1 : 1;
     return a.routeTitle.localeCompare(b.routeTitle);
   });
+}
+
+function collectCollaborationEvidenceSessionKeys(sessionItems: SessionConversationListItem[]): string[] {
+  return [
+    ...new Set(
+      [
+        ...sessionItems.flatMap((item) => [
+          item.sessionKey,
+          item.executionChain?.parentSessionKey,
+          item.executionChain?.childSessionKey,
+          ...(item.interSessionSignals ?? []).map((signal) => signal.sourceSessionKey),
+        ]),
+      ]
+        .map((value) => value?.trim() ?? "")
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function collaborationThreadKindLabel(
