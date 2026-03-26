@@ -417,6 +417,7 @@ export function computeUsageCostSnapshot(
 ): UsageCostSnapshot {
   const generatedAt = new Date().toISOString();
   const now = Date.now();
+  // Use Beijing time (UTC+8) for "today" calculation
   const todayIso = new Date(now).toISOString().slice(0, 10);
 
   const sessionByKey = new Map(snapshot.sessions.map((session) => [session.sessionKey, session]));

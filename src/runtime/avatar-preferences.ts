@@ -4,7 +4,7 @@ import { extname, join } from "node:path";
 export const AVATAR_PREFERENCES_PATH = join(process.cwd(), "runtime", "avatar-preferences.json");
 export const AVATAR_UPLOADS_DIR = join(process.cwd(), "runtime", "avatars");
 
-export type AvatarMode = "agent" | "pixel" | "custom";
+export type AvatarMode = "agent" | "pixel" | "custom" | "anime" | "beauty";
 
 export interface AgentAvatarPreference {
   mode: AvatarMode;
@@ -82,7 +82,7 @@ export function resolveEffectiveAvatar(input: {
   agentId: string;
   agentAnimal: string;
   preferences: AvatarPreferences;
-}): { mode: "pixel"; animal: string } | { mode: "custom"; image: string } {
+}): { mode: "pixel"; animal: string } | { mode: "custom"; image: string } | { mode: "anime"; image: string } | { mode: "beauty"; image: string } {
   const pref = input.preferences.agents[input.agentId];
   if (!pref || pref.mode === "agent") {
     return { mode: "pixel", animal: input.agentAnimal };
@@ -90,16 +90,23 @@ export function resolveEffectiveAvatar(input: {
   if (pref.mode === "custom" && typeof pref.image === "string" && pref.image.trim()) {
     return { mode: "custom", image: pref.image.trim() };
   }
+  if (pref.mode === "anime" && typeof pref.image === "string" && pref.image.trim()) {
+    return { mode: "anime", image: pref.image.trim() };
+  }
+  if (pref.mode === "beauty" && typeof pref.image === "string" && pref.image.trim()) {
+    return { mode: "beauty", image: pref.image.trim() };
+  }
   if (pref.mode === "pixel" && typeof pref.animal === "string" && pref.animal.trim()) {
     return { mode: "pixel", animal: pref.animal.trim() };
   }
   return { mode: "pixel", animal: input.agentAnimal };
 }
 
-export async function listAvatarUploads(): Promise<AvatarUploadEntry[]> {
+export async function listAvatarUploads(category?: string): Promise<AvatarUploadEntry[]> {
+  const baseDir = category ? join(AVATAR_UPLOADS_DIR, category) : AVATAR_UPLOADS_DIR;
   let entries;
   try {
-    entries = await readdir(AVATAR_UPLOADS_DIR, { withFileTypes: true });
+    entries = await readdir(baseDir, { withFileTypes: true });
   } catch {
     return [];
   }
@@ -114,10 +121,11 @@ export async function listAvatarUploads(): Promise<AvatarUploadEntry[]> {
   const out: AvatarUploadEntry[] = [];
   for (const fileName of files) {
     try {
-      const filePath = join(AVATAR_UPLOADS_DIR, fileName);
+      const filePath = join(baseDir, fileName);
       const info = await stat(filePath);
+      const displayFileName = category ? `${category}/${fileName}` : fileName;
       out.push({
-        fileName,
+        fileName: displayFileName,
         sizeBytes: info.size,
         updatedAt: info.mtime.toISOString(),
       });
@@ -157,7 +165,7 @@ export function upsertAgentAvatarPreference(input: {
     const animal = String(input.animal || "").trim().toLowerCase();
     if (animal) preference.animal = animal;
   }
-  if (mode === "custom") {
+  if (mode === "custom" || mode === "anime" || mode === "beauty") {
     const image = String(input.image || "").trim();
     if (image) preference.image = image;
   }
@@ -197,7 +205,7 @@ function normalizeAvatarPreferences(input: unknown): { preferences: AvatarPrefer
         const animal = prefObj.animal.trim().toLowerCase();
         if (animal) normalized.animal = animal;
       }
-      if (mode === "custom" && typeof prefObj.image === "string") {
+      if ((mode === "custom" || mode === "anime" || mode === "beauty") && typeof prefObj.image === "string") {
         const image = prefObj.image.trim();
         if (image) normalized.image = image;
       }
@@ -218,7 +226,7 @@ function normalizeAvatarPreferences(input: unknown): { preferences: AvatarPrefer
 function normalizeMode(input: unknown): AvatarMode | undefined {
   if (typeof input !== "string") return undefined;
   const trimmed = input.trim().toLowerCase();
-  if (trimmed === "agent" || trimmed === "pixel" || trimmed === "custom") return trimmed;
+  if (trimmed === "agent" || trimmed === "pixel" || trimmed === "custom" || trimmed === "anime" || trimmed === "beauty") return trimmed;
   return undefined;
 }
 

@@ -132,6 +132,7 @@ import type {
   ReadinessCategoryScore,
   ProjectState,
   ReadModelSnapshot,
+  SessionStatusSnapshot,
   TaskListItem,
   TaskState,
 } from "../types";
@@ -235,6 +236,7 @@ const DASHBOARD_SECTIONS = [
   "usage-cost",
   "office-space",
   "projects-tasks",
+  "brain",
   "alerts",
   "replay-audit",
   "settings",
@@ -334,6 +336,7 @@ const DASHBOARD_SECTION_LINKS_EN: DashboardSectionLink[] = [
   { key: "memory", label: "Memory", blurb: "Daily and long-term memories" },
   { key: "docs", label: "Documents", blurb: "Main and active agent core docs" },
   { key: "projects-tasks", label: "Tasks", blurb: "Board, schedule and activity" },
+  { key: "brain", label: "Brain", blurb: "Live conversations and thinking" },
   { key: "settings", label: "Settings", blurb: "Safety and data links" },
 ] as const;
 const ANIMAL_CATALOG = [
@@ -361,7 +364,7 @@ const ANIMAL_CATALOG = [
   {
     key: "monkey",
     title: "Monkey Builder",
-    accent: "#f4c542",
+    accent: "#f0a030",
     sprite: " /\\_/\\ \n( @.@ )\n /|_|\\ \n  / \\  ",
     keywords: ["monkey", "ape", "creative", "hack"],
   },
@@ -396,7 +399,7 @@ const ANIMAL_CATALOG = [
   {
     key: "eagle",
     title: "Eagle Scout",
-    accent: "#ffe07d",
+    accent: "#e6b422",
     sprite: "  /\\_/\\\n==(o)==\n  /_\\  \n  / \\  ",
     keywords: ["eagle", "vision", "scan", "observer"],
   },
@@ -1184,13 +1187,15 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
       }
 
       if (method === "GET" && path === "/api/avatar/uploads") {
-        assertAllowedQueryParams(url.searchParams, [], true);
-        const uploads = await listAvatarUploads();
+        assertAllowedQueryParams(url.searchParams, ["category"], true);
+        const category = normalizeQueryString(url.searchParams.get("category"), "category", 64, true) || "";
+        const uploads = category ? await listAvatarUploads(category) : await listAvatarUploads();
         return writeJson(res, 200, {
           ok: true,
           directory: AVATAR_UPLOADS_DIR,
           count: uploads.length,
           uploads,
+          items: uploads,
         });
       }
 
@@ -1200,10 +1205,11 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
         const payload = expectObject(await readJsonBody(req), "avatar upload payload");
         const dataUrl = optionalBoundedString(payload.dataUrl, "dataUrl", AVATAR_UPLOAD_MAX_BYTES * 2);
         const fileNameHint = optionalBoundedString(payload.fileName, "fileName", 160);
+        const category = optionalBoundedString(payload.category, "category", 64) || "";
         if (!dataUrl) {
           throw new RequestValidationError("dataUrl is required.", 400);
         }
-        const saved = await writeAvatarUploadFromDataUrl({ dataUrl, fileNameHint });
+        const saved = await writeAvatarUploadFromDataUrl({ dataUrl, fileNameHint, category });
         return writeJson(res, 200, { ok: true, upload: saved });
       }
 
@@ -1240,8 +1246,8 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
         const animal = optionalBoundedString(payload.animal, "animal", 64);
         const image = optionalBoundedString(payload.image, "image", 240);
         if (!agentId) throw new RequestValidationError("agentId is required.", 400);
-        if (!mode || (mode !== "agent" && mode !== "pixel" && mode !== "custom")) {
-          throw new RequestValidationError("mode must be one of: agent, pixel, custom", 400);
+        if (!mode || (mode !== "agent" && mode !== "pixel" && mode !== "custom" && mode !== "anime" && mode !== "beauty")) {
+          throw new RequestValidationError("mode must be one of: agent, pixel, custom, anime, beauty", 400);
         }
         const current = await loadAvatarPreferences();
         const merged = upsertAgentAvatarPreference({
@@ -1373,6 +1379,252 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
           ok: true,
           usage,
         });
+      }
+
+      if (method === "GET" && path === "/api/brain/sessions") {
+        assertAllowedQueryParams(url.searchParams, [], true);
+        const snapshot = await readReadModelSnapshotWithLiveSessions(toolClient);
+        const statusMap = new Map<string, SessionStatusSnapshot>();
+        for (const s of snapshot.statuses) statusMap.set(s.sessionKey, s);
+        const sessions = snapshot.sessions.map((session) => {
+          const status = statusMap.get(session.sessionKey);
+          return {
+            agentId: session.agentId ?? "",
+            sessionKey: session.sessionKey,
+            sessionLabel: session.label ?? session.sessionKey,
+            state: session.state,
+            model: status?.model ?? "",
+            lastMessageAt: session.lastMessageAt ?? "",
+            tokensIn: status?.tokensIn ?? 0,
+            tokensOut: status?.tokensOut ?? 0,
+          };
+        });
+        sessions.sort((a, b) => {
+          const ta = a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0;
+          const tb = b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0;
+          return tb - ta;
+        });
+        // Enrich with latest snippet
+        const enriched = await Promise.all(sessions.map(async (s) => {
+          try {
+            const detail = await getSessionConversationDetail({
+              snapshot,
+              client: toolClient,
+              sessionKey: s.sessionKey,
+              historyLimit: 1,
+            });
+            return {
+              ...s,
+              latestSnippet: detail?.latestSnippet ? detail.latestSnippet.slice(0, 200) : "",
+              latestRole: detail?.latestRole ?? "",
+            };
+          } catch {
+            return { ...s, latestSnippet: "", latestRole: "" };
+          }
+        }));
+        return writeJson(res, 200, { ok: true, sessions: enriched });
+      }
+
+      if (method === "GET" && path.startsWith("/api/brain/session/")) {
+        const sessionKey = decodeRouteParam(path, /^\/api\/brain\/session\/([^/]+)$/, "sessionKey");
+        assertAllowedQueryParams(url.searchParams, ["limit"], true);
+        const limit = readPositiveIntQuery(url.searchParams.get("limit"), "limit", 20, true, 200);
+        const snapshot = await readReadModelSnapshotWithLiveSessions(toolClient);
+        const detail = await getSessionConversationDetail({
+          snapshot,
+          client: toolClient,
+          sessionKey,
+          historyLimit: limit,
+        });
+        if (!detail) {
+          return writeApiError(res, 404, "NOT_FOUND", `Session '${sessionKey}' was not found.`);
+        }
+        const messages = detail.history.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp ?? "",
+          kind: msg.kind,
+          toolName: msg.toolName ?? "",
+          toolStatus: msg.toolStatus ?? "",
+        }));
+        return writeJson(res, 200, {
+          ok: true,
+          session: {
+            sessionKey: detail.session.sessionKey,
+            label: detail.session.label ?? detail.session.sessionKey,
+            agentId: detail.session.agentId ?? "",
+            state: detail.session.state,
+            model: detail.status?.model ?? "",
+          },
+          messages,
+        });
+      }
+
+      if (method === "GET" && path === "/api/brain/timeline") {
+        assertAllowedQueryParams(url.searchParams, ["limit"], true);
+        const limit = readPositiveIntQuery(url.searchParams.get("limit"), "limit", 50, true, 200);
+        const snapshot = await readReadModelSnapshotWithLiveSessions(toolClient);
+        const items: Array<Record<string, unknown>> = [];
+        const sessionMeta = new Map<string, { label: string; agentId: string; state: string; accent: string; displayName: string; roleLabel: string }>();
+
+        const agentDisplayNames: Record<string, string> = {
+          main: "龙虾主管",
+          coder: "设计师",
+          secretary: "秘书",
+          "product-analyst": "产品分析员",
+          "test-controller": "测试员",
+        };
+
+        for (const session of snapshot.sessions) {
+          const agentId = session.agentId ?? "";
+          const identity = deriveAgentAnimalIdentity(agentId);
+          const isSubagent = session.sessionKey?.includes(":subagent:") ?? false;
+          const displayName = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? agentId ?? "Agent");
+          const roleLabel = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? "助手");
+          sessionMeta.set(session.sessionKey, {
+            label: session.label ?? session.sessionKey,
+            agentId,
+            state: session.state,
+            accent: identity.accent,
+            displayName,
+            roleLabel,
+          });
+        }
+
+        await Promise.all(snapshot.sessions.map(async (session) => {
+          try {
+            const detail = await getSessionConversationDetail({
+              snapshot,
+              client: toolClient,
+              sessionKey: session.sessionKey,
+              historyLimit: Math.min(limit, 20),
+            });
+            if (!detail) return;
+            const meta = sessionMeta.get(session.sessionKey);
+            for (const msg of detail.history) {
+              items.push({
+                sessionKey: session.sessionKey,
+                sessionLabel: meta?.label ?? session.sessionKey,
+                agentId: meta?.agentId ?? "",
+                sessionState: meta?.state ?? session.state,
+                accent: meta?.accent ?? "#8ad2ff",
+                displayName: meta?.displayName ?? meta?.agentId ?? "Agent",
+                roleLabel: meta?.roleLabel ?? "助手",
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.timestamp ?? "",
+                kind: msg.kind,
+                toolName: msg.toolName ?? "",
+                toolStatus: msg.toolStatus ?? "",
+              });
+            }
+          } catch { /* skip failed sessions */ }
+        }));
+
+        // Sort by timestamp descending (newest first)
+        items.sort((a, b) => {
+          const ta = a.timestamp ? Date.parse(String(a.timestamp)) : 0;
+          const tb = b.timestamp ? Date.parse(String(b.timestamp)) : 0;
+          return tb - ta;
+        });
+
+        return writeJson(res, 200, { ok: true, items: items.slice(0, limit) });
+      }
+
+      if (method === "GET" && path === "/api/brain/stream") {
+        assertAllowedQueryParams(url.searchParams, [], true);
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "X-Accel-Buffering": "no",
+        });
+        res.write("retry: 3000\n\n");
+
+        let lastHash = "";
+        let closed = false;
+        const checkInterval = setInterval(async () => {
+          if (closed) return;
+          try {
+            const snapshot = await readReadModelSnapshotWithLiveSessions(toolClient);
+            const items: Array<Record<string, unknown>> = [];
+            const sessionMeta = new Map<string, { label: string; agentId: string; state: string; accent: string; displayName: string; roleLabel: string }>();
+
+            const agentDisplayNames: Record<string, string> = {
+              main: "龙虾主管",
+              coder: "设计师",
+              secretary: "秘书",
+              "product-analyst": "产品分析员",
+          "test-controller": "测试员",
+            };
+
+            for (const session of snapshot.sessions) {
+              const agentId = session.agentId ?? "";
+              const identity = deriveAgentAnimalIdentity(agentId);
+              const isSubagent = session.sessionKey?.includes(":subagent:") ?? false;
+              const displayName = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? agentId ?? "Agent");
+              const roleLabel = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? "助手");
+              sessionMeta.set(session.sessionKey, {
+                label: session.label ?? session.sessionKey,
+                agentId,
+                state: session.state,
+                accent: identity.accent,
+                displayName,
+                roleLabel,
+              });
+            }
+
+            await Promise.all(snapshot.sessions.map(async (session) => {
+              try {
+                const detail = await getSessionConversationDetail({
+                  snapshot,
+                  client: toolClient,
+                  sessionKey: session.sessionKey,
+                  historyLimit: 10,
+                });
+                if (!detail) return;
+                const meta = sessionMeta.get(session.sessionKey);
+                for (const msg of detail.history) {
+                  items.push({
+                    sessionKey: session.sessionKey,
+                    sessionLabel: meta?.label ?? session.sessionKey,
+                    agentId: meta?.agentId ?? "",
+                    sessionState: meta?.state ?? session.state,
+                    accent: meta?.accent ?? "#8ad2ff",
+                    displayName: meta?.displayName ?? meta?.agentId ?? "Agent",
+                    roleLabel: meta?.roleLabel ?? "助手",
+                    role: msg.role,
+                    content: msg.content,
+                    timestamp: msg.timestamp ?? "",
+                    kind: msg.kind,
+                    toolName: msg.toolName ?? "",
+                    toolStatus: msg.toolStatus ?? "",
+                  });
+                }
+              } catch { /* skip */ }
+            }));
+
+            items.sort((a, b) => {
+              const ta = a.timestamp ? Date.parse(String(a.timestamp)) : 0;
+              const tb = b.timestamp ? Date.parse(String(b.timestamp)) : 0;
+              return tb - ta;
+            });
+
+            // Simple hash-based change detection
+            const hash = items.length + ":" + (items[0]?.timestamp ?? "");
+            if (hash !== lastHash) {
+              lastHash = hash;
+              const payload = JSON.stringify({ type: "timeline", items: items.slice(0, 50) });
+              res.write(`data: ${payload}\n\n`);
+            }
+          } catch { /* ignore errors during polling */ }
+        }, 3000);
+
+        req.on("close", () => {
+          closed = true;
+          clearInterval(checkInterval);
+        });
+        return;
       }
 
       if (method === "GET" && path === "/api/subscription/template") {
@@ -2242,7 +2494,7 @@ function globalVisibilityCopy(language: UiLanguage): GlobalVisibilityCopy {
 function formatExecutorAgentLabel(agentId: string, language: UiLanguage): string {
   const normalized = agentId.trim().toLowerCase();
   if (!normalized || normalized === "system") return pickUiText(language, "System service", "系统服务");
-  if (normalized === "system-cron") return pickUiText(language, "Scheduler", "调度器");
+  if (normalized === "system-cron") return pickUiText(language, "Gateway", "Gateway");
   if (normalized === "task-heartbeat-worker") return pickUiText(language, "Heartbeat service", "任务心跳服务");
   return humanizeOperatorLabel(agentId);
 }
@@ -2276,6 +2528,9 @@ function sanitizeCronPurposeText(input: string, language: UiLanguage, maxLength 
     lower.includes("/users/")
   ) {
     return pickUiText(language, "Run one automation script and update status.", "执行一次自动化脚本并更新状态。");
+  }
+  if (lower.includes("刷新面板") || (lower.includes("curl") && lower.includes("4310"))) {
+    return pickUiText(language, "Refresh dashboard.", "刷新面板");
   }
   return safeTruncate(normalized, maxLength);
 }
@@ -2331,18 +2586,28 @@ function cronPayloadPurpose(payload: Record<string, unknown> | undefined, langua
       return summarizeCronCommandPurpose(command, language);
     }
   }
+  if (kind === "systemEvent") {
+    const text = typeof payload.text === "string" ? payload.text.trim() : "";
+    if (text) {
+      return sanitizeCronPurposeText(text, language);
+    }
+  }
   if (typeof payload.message === "string" && payload.message.trim()) {
     return sanitizeCronPurposeText(payload.message, language);
   }
   return pickUiText(language, "No purpose description.", "未提供任务目的。");
 }
 
-function cronPayloadOwner(payload: Record<string, unknown> | undefined, language: UiLanguage): string {
+function cronPayloadOwner(payload: Record<string, unknown> | undefined, language: UiLanguage, sessionTarget?: string): string {
   if (!payload) return pickUiText(language, "Scheduler", "调度器");
   const ownerAgentId = cronPayloadOwnerAgentId(payload);
   if (ownerAgentId) return humanizeOperatorLabel(ownerAgentId);
-  const sessionOwner = parseSessionTargetOwner(typeof payload.sessionTarget === "string" ? payload.sessionTarget : undefined);
+  const sessionOwner = parseSessionTargetOwner(typeof payload.sessionTarget === "string" ? payload.sessionTarget : sessionTarget);
   if (sessionOwner) return humanizeOperatorLabel(sessionOwner);
+  // Handle plain sessionTarget like "main", "coder" etc.
+  if (sessionTarget && sessionTarget.trim() && !sessionTarget.includes(":")) {
+    return humanizeOperatorLabel(sessionTarget.trim());
+  }
   return pickUiText(language, "Scheduler", "调度器");
 }
 
@@ -2439,12 +2704,13 @@ async function loadOpenclawCronCatalog(language: UiLanguage): Promise<OpenclawCr
         const name = typeof obj.name === "string" && obj.name.trim() ? obj.name.trim() : jobId;
         const payload = asObject(obj.payload);
         const schedule = asObject(obj.schedule);
+        const sessionTargetStr = typeof obj.sessionTarget === "string" ? obj.sessionTarget : undefined;
         jobs.push({
           jobId,
           name,
           enabled: obj.enabled !== false,
-          owner: cronPayloadOwner(payload, language),
-          ownerAgentId: cronPayloadOwnerAgentId(payload),
+          owner: cronPayloadOwner(payload, language, sessionTargetStr),
+          ownerAgentId: cronPayloadOwnerAgentId(payload) ?? parseSessionTargetOwner(sessionTargetStr) ?? undefined,
           purpose: cronPayloadPurpose(payload, language),
           scheduleLabel: cronScheduleLabel(schedule, language),
           sourcePath: candidate,
@@ -2752,6 +3018,9 @@ function dashboardSectionLinks(language: UiLanguage): DashboardSectionLink[] {
     }
     if (item.key === "projects-tasks") {
       return { ...item, label: "任务", blurb: "任务、排程与活动" };
+    }
+    if (item.key === "brain") {
+      return { ...item, label: "智脑", blurb: "实时对话与思考" };
     }
     return { ...item, label: "设置", blurb: "安全与数据连接" };
   });
@@ -3313,6 +3582,100 @@ function renderOpenClawConnectionCard(
       )
       .join("")}</div>
   </article>`;
+}
+
+function renderBrainSection(language: UiLanguage): string {
+  const t = (en: string, zh: string) => pickUiText(language, en, zh);
+  const title = t("Brain", "智脑");
+  const subtitle = t("Live conversations and thinking", "实时对话与思考");
+  const loadingText = t("Loading...", "加载中...");
+  const emptyText = t("No recent activity.", "暂无最近活动。");
+
+  return [
+    '<section class="card" id="brain-section">',
+    '<h2>' + escapeHtml(title) + '</h2>',
+    '<div class="meta">' + escapeHtml(subtitle) + '</div>',
+    '<div class="brain-timeline" id="brain-timeline" style="max-height:720px;overflow-y:auto;">',
+    '<div class="empty-state">' + escapeHtml(loadingText) + '</div>',
+    '</div>',
+    '</section>',
+    '<script>',
+    '(function() {',
+    'var el = document.getElementById("brain-timeline");',
+    'if (!el) return;',
+    'function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=String(s);return d.innerHTML;}',
+    'function ftime(ts){if(!ts)return"";try{var d=new Date(ts);return("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);}catch(e){return"";}}',
+    'var cbStyle="background:#1e1e1e;color:#d4d4d4;padding:10px 12px;border-radius:6px;font-size:12px;line-height:1.5;overflow-x:auto;margin:6px 0;border:1px solid #333;font-family:monospace;white-space:pre-wrap;word-break:break-word;";',
+    'function toCodeBlock(text){return "<pre style=\\""+cbStyle+"\\">"+esc(text)+"</pre>";}',
+    '',
+    'function fmtContent(text){',
+    'if(!text)return"";',
+    'var s=String(text);',
+    'var result="";',
+    'var lastEnd=0;',
+    // Detect ```code``` blocks
+    'var codeRe=/```(?:\\w*\\n)?([\\s\\S]*?)```/g;',
+    'var match;',
+    'while((match=codeRe.exec(s))!==null){',
+    '  var before=s.substring(lastEnd,match.index);',
+    '  if(before.trim()){result+="<div style=\\"font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#1a1a1a;padding:4px 0;\\">"+esc(before)+"</div>";}',
+    '  result+=toCodeBlock(match[1].trim());',
+    '  lastEnd=match.index+match[0].length;',
+    '}',
+    'var remaining=s.substring(lastEnd);',
+    // Detect standalone JSON
+    'var rTrim=remaining.trim();',
+    'if((rTrim.charAt(0)==="{"&&rTrim.charAt(rTrim.length-1)==="}")||(rTrim.charAt(0)==="["&&rTrim.charAt(rTrim.length-1)==="]")){',
+    '  try{var f=JSON.stringify(JSON.parse(rTrim),null,2);',
+    '  if(result)return result+toCodeBlock(f);',
+    '  return toCodeBlock(f);',
+    '}catch(e){}',
+    '}',
+    'if(remaining.trim()){result+="<div style=\\"font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#1a1a1a;padding:4px 0;\\">"+esc(remaining)+"</div>";}',
+    'return result||"<div style=\\"font-size:13px;line-height:1.6;color:#1a1a1a;\\">"+esc(s)+"</div>";',
+    '}',
+    '',
+    'function render(items){',
+    'if(!items||!items.length){el.innerHTML="<div class=\\"empty-state\\">"+esc("' + escapeHtml(emptyText) + '")+"</div>";return;}',
+    'var h="";',
+    'for(var i=0;i<items.length;i++){',
+    'var it=items[i],ac=it.accent||"#8ad2ff";',
+    'var nm=esc(it.displayName||it.agentId||"?");',
+    'var sk=(it.sessionKey||"").split(":").pop()||"";',
+    'var tag=esc(sk.slice(-8));',
+    'var tm=esc(ftime(it.timestamp));',
+    'var u=it.role==="user",tl=it.kind==="tool_event",th=it.kind==="thinking";',
+    'var rb=u?"<span class=\\"badge warn\\">User</span>":tl?"<span class=\\"badge ok\\">Tool</span>":th?"<span style=\\"color:#8ad2ff;\\">Thinking</span>":"<span class=\\"badge ok\\">"+esc(it.roleLabel||"Agent")+"</span>";',
+    'var ti=it.toolName?"<div class=\\"meta\\" style=\\"margin-top:4px;\\">"+esc(it.toolName)+(it.toolStatus?" "+esc(it.toolStatus):"")+"</div>":"";',
+    'var content=fmtContent(it.content);',
+    'h+="<div style=\\"padding:8px 12px;margin-bottom:8px;border-left:3px solid "+ac+";border-radius:0 6px 6px 0;background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.12);\\">"',
+    '+"<div style=\\"display:flex;align-items:center;gap:6px;margin-bottom:4px;\\">"',
+    '+"<strong style=\\"color:"+ac+";font-size:13px;\\">"+nm+"</strong>"',
+    '+"<span style=\\"color:#888;font-size:10px;font-family:monospace;\\">"+tag+"</span>"',
+    '+rb',
+    '+"<span style=\\"color:#999;font-size:10px;margin-left:auto;\\">"+tm+"</span>"',
+    '+"</div>"',
+    '+content+ti+"</div>";',
+    '}',
+    'el.innerHTML=h;',
+    '}',
+    'function load(){',
+    'fetch("/api/brain/timeline?limit=50",{cache:"no-store"})',
+    '.then(function(r){return r.json();})',
+    '.then(function(d){if(d&&d.ok&&d.items)render(d.items);})',
+    '.catch(function(){el.innerHTML="<div class=\\"empty-state\\">Load failed</div>";});',
+    '}',
+    'var es=null;',
+    'function sse(){',
+    'if(es){try{es.close();}catch(e){}}',
+    'es=new EventSource("/api/brain/stream");',
+    'es.onmessage=function(e){try{var d=JSON.parse(e.data);if(d&&d.items)render(d.items);}catch(ex){}};',
+    'es.onerror=function(){setTimeout(sse,3000);};',
+    '}',
+    'load();sse();',
+    '})();',
+    '</script>',
+  ].join('\n');
 }
 
 function renderOpenClawSecuritySection(
@@ -6013,6 +6376,27 @@ async function renderHtml(
           <a class="btn" href="${escapeHtml(staffHubHref)}">${escapeHtml(t("Open staff", "查看员工"))}</a>
         </div>
         ${overviewBusyCardsHtml}
+        <script>
+        (function(){
+          var AGENT_NAMES = {'main':'龙虾主管','coder':'设计师','secretary':'秘书','product-analyst':'产品分析员','test-controller':'测试员'};
+          setInterval(function(){
+            fetch('/api/brain/sessions',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+              if(!d||!d.sessions)return;
+              var grid = document.querySelector('.overview-busy-grid');
+              if(!grid)return;
+              var active = d.sessions.filter(function(s){return s.state==='running'&&s.agentId;});
+              if(active.length===0)return;
+              var seen = {}, html = '';
+              for(var i=0;i<active.length;i++){
+                var s = active[i]; if(seen[s.agentId])continue; seen[s.agentId]=true;
+                var nm = AGENT_NAMES[s.agentId]||s.agentId;
+                html += '<article class="overview-busy-card"><div class="overview-busy-head"><strong>'+nm+'</strong><span>实时</span></div><div class="overview-busy-copy">'+(s.sessionLabel||'')+'</div><div class="meta">会话 1</div></article>';
+              }
+              if(html) grid.innerHTML = html;
+            }).catch(function(){});
+          }, 5000);
+        })();
+        </script>
       </article>
       <article class="card overview-usage-card" id="usage-pulse">
         <div class="overview-command-head">
@@ -6690,6 +7074,7 @@ async function renderHtml(
   if (options.section === "usage-cost") sectionBody = usageSection;
   if (options.section === "office-space") sectionBody = teamUnifiedSection;
   if (options.section === "projects-tasks") sectionBody = projectsSection;
+  if (options.section === "brain") sectionBody = renderBrainSection(options.language);
   if (options.section === "alerts") sectionBody = alertsSection;
   if (options.section === "replay-audit") sectionBody = replaySection;
   if (options.section === "settings") sectionBody = settingsSection;
@@ -7379,6 +7764,9 @@ async function renderHtml(
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--space-2);
     }
+    .overview-kpi-card[data-overview-kpi="today-usage"] {
+      grid-column: span 2;
+    }
     .overview-decision-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7987,12 +8375,12 @@ async function renderHtml(
     }
     .task-hub-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: 1fr;
       gap: var(--space-2);
       align-items: start;
     }
     .task-hub-board-grid {
-      grid-template-columns: minmax(0, 1.6fr) minmax(340px, 1fr);
+      grid-template-columns: 1fr;
     }
     .task-hub-sidebar {
       display: grid;
@@ -9953,7 +10341,7 @@ async function renderHtml(
           </div>
         </div>
         <h1>OpenClaw Control Center</h1>
-        <div class="meta">${escapeHtml(t("Updated", "更新时间"))}${escapeHtml(options.language === "en" ? ": " : "：")}${escapeHtml(snapshot.generatedAt ?? t("Not available", "暂无"))}</div>
+        <div class="meta">${escapeHtml(t("Updated", "更新时间"))}${escapeHtml(options.language === "en" ? ": " : "：")}${escapeHtml(snapshot.generatedAt ? snapshot.generatedAt : t("Not available", "暂无"))}</div>
         ${languageToggle}
       </div>
       <nav class="nav-links">${sectionNav}</nav>
@@ -11724,6 +12112,8 @@ function searchScopeLabel(scope: DashboardSearchScope, language: UiLanguage = "z
 }
 
 function humanizeOperatorLabel(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === "system-cron") return "Gateway";
   const normalized = value.trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
   if (!normalized) return "未知助手";
   return normalized.replace(/\b\w/g, (match) => match.toUpperCase());
@@ -12448,12 +12838,12 @@ function renderStaffOverviewCards(
       });
       const effectiveAnimal = effective.mode === "pixel" ? effective.animal : card.identity.animal;
       const stageInner =
-        effective.mode === "custom"
+        (effective.mode === "custom" || effective.mode === "anime" || effective.mode === "beauty")
           ? `<img class="agent-avatar-img" src="/avatars/${escapeHtml(effective.image)}" alt="${escapeHtml(card.displayName)}" loading="lazy" />`
           : `<canvas class="agent-pixel-canvas" width="256" height="256"></canvas>`;
-      const avatar = `<div class="staff-avatar" style="--agent-accent:${escapeHtml(card.identity.accent)};" data-agent-id="${escapeHtml(card.agentId)}" data-animal="${escapeHtml(effectiveAnimal)}" data-avatar-mode="${escapeHtml(effective.mode)}" data-avatar-image="${escapeHtml(effective.mode === "custom" ? effective.image : "")}">
+      const avatar = `<div class="staff-avatar" style="--agent-accent:${escapeHtml(card.identity.accent)};" data-agent-id="${escapeHtml(card.agentId)}" data-animal="${escapeHtml(effectiveAnimal)}" data-avatar-mode="${escapeHtml(effective.mode)}" data-avatar-image="${escapeHtml(effective.mode === "custom" || effective.mode === "anime" || effective.mode === "beauty" ? effective.image : "")}">
         <div class="agent-stage" aria-hidden="true">${stageInner}</div>
-        <button type="button" class="avatar-edit-btn" aria-label="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}" title="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}">
+        <button type="button" class="avatar-edit-btn"" aria-label="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}" title="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 20h4l10.6-10.6a2.2 2.2 0 0 0 0-3.1l-0.9-0.9a2.2 2.2 0 0 0-3.1 0L4 16v4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
             <path d="M13.8 6.2l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -14077,13 +14467,13 @@ function renderOfficeCards(
       });
       const effectiveAnimal = effective.mode === "pixel" ? effective.animal : card.identity.animal;
       const stageInner =
-        effective.mode === "custom"
+        (effective.mode === "custom" || effective.mode === "anime" || effective.mode === "beauty")
           ? `<img class="agent-avatar-img" src="/avatars/${escapeHtml(effective.image)}" alt="${escapeHtml(card.agentId)}" loading="lazy" />`
           : `<canvas class="agent-pixel-canvas" width="224" height="160"></canvas>`;
-      const avatar = `<div class="agent-avatar" style="--agent-accent:${escapeHtml(card.identity.accent)};" data-agent-id="${escapeHtml(card.agentId)}" data-animal="${escapeHtml(effectiveAnimal)}" data-avatar-mode="${escapeHtml(effective.mode)}" data-avatar-image="${escapeHtml(effective.mode === "custom" ? effective.image : "")}">
+      const avatar = `<div class="agent-avatar" style="--agent-accent:${escapeHtml(card.identity.accent)};" data-agent-id="${escapeHtml(card.agentId)}" data-animal="${escapeHtml(effectiveAnimal)}" data-avatar-mode="${escapeHtml(effective.mode)}" data-avatar-image="${escapeHtml(effective.mode === "custom" || effective.mode === "anime" || effective.mode === "beauty" ? effective.image : "")}">
         <div class="agent-stage" aria-hidden="true">${stageInner}</div>
         <div class="agent-animal-label">${escapeHtml(animalLabel(card.identity.animal, language))}</div>
-        <button type="button" class="avatar-edit-btn" aria-label="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}" title="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}">
+        <button type="button" class="avatar-edit-btn"" aria-label="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}" title="${escapeHtml(pickUiText(language, "Edit avatar", "编辑头像"))}">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 20h4l10.6-10.6a2.2 2.2 0 0 0 0-3.1l-0.9-0.9a2.2 2.2 0 0 0-3.1 0L4 16v4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
             <path d="M13.8 6.2l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -14463,6 +14853,120 @@ function renderHeaderControlsScript(language: UiLanguage = "zh"): string {
     }
   };
 
+  const setupAutoRefresh = () => {
+    const AUTO_REFRESH_MS = 5000;
+    let refreshing = false;
+    setInterval(async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const resp = await fetch("/api/usage-cost", { cache: "no-store" });
+        const data = await resp.json();
+        if (!data.ok || !data.usage) { refreshing = false; return; }
+        const usage = data.usage;
+        // Update "today-usage" KPI card on overview
+        const todayCard = document.querySelector('[data-overview-kpi="today-usage"]');
+        if (todayCard) {
+          const today = usage.periods.find((p) => p.key === "today");
+          if (today) {
+            const valueEl = todayCard.querySelector(".overview-kpi-value");
+            const detailEl = todayCard.querySelector(".overview-kpi-detail");
+            if (valueEl) valueEl.textContent = (today.tokens || 0).toLocaleString();
+            if (detailEl) detailEl.textContent = "费用 $" + (today.estimatedCost || 0).toFixed(2);
+          }
+        }
+        // Update usage chips in "当前 AI 用量" section
+        const pulseEl = document.getElementById('usage-pulse');
+        if (pulseEl) {
+          const chips = pulseEl.querySelectorAll('.usage-chip');
+          const periodKeys = ['today', '7d', '30d'];
+          chips.forEach((chip, i) => {
+            const period = usage.periods.find((p) => p.key === periodKeys[i]) || usage.periods[i];
+            if (!period) return;
+            const spans = chip.querySelectorAll('span');
+            const strong = chip.querySelector('strong');
+            if (strong) strong.textContent = 'AI 用量：' + (period.tokens || 0).toLocaleString();
+            if (spans[1]) spans[1].textContent = '预估费用：$' + (period.estimatedCost || 0).toFixed(2);
+            if (spans[2]) spans[2].textContent = '请求数：' + (period.requestCount || 0);
+          });
+        }
+        // Update usage-cost section table if visible
+        document.querySelectorAll(".usage-period-table tbody tr").forEach((row, i) => {
+          const period = usage.periods[i];
+          if (!period) return;
+          const cells = row.querySelectorAll("td");
+          if (cells.length >= 3) {
+            cells[0].textContent = (period.tokens || 0).toLocaleString();
+            cells[1].textContent = "$" + (period.estimatedCost || 0).toFixed(2);
+            if (cells[2]) cells[2].textContent = String(period.requestCount || "-");
+          }
+        });
+        // Update subscription card
+        if (usage.subscription && usage.subscription.consumed !== undefined) {
+          const subCard = document.querySelector('[data-overview-kpi="subscription"]');
+          if (subCard) {
+            const val = subCard.querySelector('.overview-kpi-value');
+            const det = subCard.querySelector('.overview-kpi-detail');
+            if (val) val.textContent = '$' + (usage.subscription.consumed || 0).toFixed(4) + ' / $' + (usage.subscription.limit || 0).toFixed(2);
+            if (det && usage.subscription.usagePercent !== undefined) det.textContent = usage.subscription.usagePercent.toFixed(1) + '% used';
+          }
+        }
+      } catch {} finally { refreshing = false; }
+
+      // Refresh "谁在忙" section
+      try {
+        const resp2 = await fetch("/api/brain/sessions", { cache: "no-store" });
+        const data2 = await resp2.json();
+        if (data2.ok && data2.sessions) {
+          // Update "谁在忙" on overview
+          const busyGrid = document.querySelector('.overview-busy-grid');
+          if (busyGrid) {
+            const activeSessions = data2.sessions.filter(function(s) { return s.state === 'running' && s.agentId; });
+            if (activeSessions.length > 0) {
+              var html = '';
+              var seen = {};
+              for (var i = 0; i < activeSessions.length; i++) {
+                var s = activeSessions[i];
+                if (seen[s.agentId]) continue;
+                seen[s.agentId] = true;
+                var name = {'main':'龙虾主管','coder':'设计师','secretary':'秘书','product-analyst':'产品分析员','test-controller':'测试员'}[s.agentId] || s.agentId;
+                html += '<article class="overview-busy-card">'
+                  + '<div class="overview-busy-head"><strong>' + name + '</strong><span>实时</span></div>'
+                  + '<div class="overview-busy-copy">' + (s.sessionLabel || s.sessionKey || '') + '</div>'
+                  + '<div class="meta">会话 1</div>'
+                  + '</article>';
+              }
+              if (html) busyGrid.innerHTML = html;
+            }
+          }
+          // Update staff page status badges
+          try {
+            document.querySelectorAll('.staff-brief-card, .office-card').forEach(function(card) {
+              try {
+                var agentEl = card.querySelector('[data-agent-id]');
+                if (!agentEl) return;
+                var id = agentEl.getAttribute('data-agent-id') || '';
+                if (!id) return;
+                var agentSessions = data2.sessions.filter(function(s) { return s.agentId === id; });
+                var running = agentSessions.filter(function(s) { return s.state === 'running'; }).length;
+                var badge = card.querySelector('.badge');
+                if (badge) {
+                  if (running > 0) {
+                    badge.textContent = '运行中';
+                    badge.className = 'badge ok';
+                  } else {
+                    badge.textContent = '待命';
+                    badge.className = 'badge';
+                  }
+                }
+              } catch(e) {}
+            });
+          } catch(e) {}
+        }
+      } catch {}
+    }, AUTO_REFRESH_MS);
+  };
+
   const captureState = () => {
     const inputs = Array.from(document.querySelectorAll('input, textarea, select'));
     const items = inputs.map((node) => {
@@ -14533,9 +15037,10 @@ function renderHeaderControlsScript(language: UiLanguage = "zh"): string {
 
   // 确保在DOM加载完成后设置刷新按钮
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupRefreshButton);
+    document.addEventListener('DOMContentLoaded', () => { setupRefreshButton(); setupAutoRefresh(); });
   } else {
     setupRefreshButton();
+    setupAutoRefresh();
   }
 
   const bootRestore = () => {
@@ -17582,8 +18087,10 @@ function normalizeSafeFileName(input: string): string | undefined {
   const trimmed = String(input || "").trim();
   if (!trimmed) return undefined;
   if (trimmed.length > 160) return undefined;
-  if (trimmed.includes("/") || trimmed.includes("\\") || trimmed.includes("..")) return undefined;
+  if (trimmed.includes("\\") || trimmed.includes("..")) return undefined;
   if (/[\u0000-\u001F\u007F]/.test(trimmed)) return undefined;
+  // Allow forward slash for category subdirectories (e.g., anime/file.png)
+  if (trimmed.startsWith("/")) return undefined;
   return trimmed;
 }
 
@@ -17611,8 +18118,10 @@ async function serveAvatarFile(res: ServerResponse, rawFileName: string): Promis
   }
 }
 
-async function writeAvatarUploadFromDataUrl(input: { dataUrl: string; fileNameHint?: string }): Promise<{ fileName: string; sizeBytes: number }> {
-  await mkdir(AVATAR_UPLOADS_DIR, { recursive: true });
+async function writeAvatarUploadFromDataUrl(input: { dataUrl: string; fileNameHint?: string; category?: string }): Promise<{ fileName: string; sizeBytes: number }> {
+  const category = (input.category || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  const targetDir = category ? join(AVATAR_UPLOADS_DIR, category) : AVATAR_UPLOADS_DIR;
+  await mkdir(targetDir, { recursive: true });
   const raw = String(input.dataUrl || "").trim();
   const match = /^data:(image\/png|image\/jpeg|image\/webp);base64,([A-Za-z0-9+/=]+)$/.exec(raw);
   if (!match) {
@@ -17627,7 +18136,7 @@ async function writeAvatarUploadFromDataUrl(input: { dataUrl: string; fileNameHi
   const hint = normalizeSafeFileName(input.fileNameHint || "");
   const hintedBase = hint ? basename(hint, extname(hint)) : "";
   const base = hintedBase && /^[a-zA-Z0-9._-]+$/.test(hintedBase) ? hintedBase.slice(0, 48) : "avatar";
-  const fileName = `${base}-${randomUUID()}${ext}`;
+  const fileName = `${category ? category + '/' : ''}${base}-${randomUUID()}${ext}`;
   const filePath = join(AVATAR_UPLOADS_DIR, fileName);
   await writeFile(filePath, buffer);
   return { fileName, sizeBytes: buffer.length };
