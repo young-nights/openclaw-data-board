@@ -110,6 +110,14 @@ export interface UsageBreakdownRow {
   sourceStatus: ConnectionStatus;
 }
 
+export interface MonthlyModelRow {
+  month: string; // "2026-01"
+  model: string;
+  tokens: number;
+  estimatedCost: number;
+  requests: number;
+}
+
 export interface UsageBudgetStatus {
   status: "ok" | "warn" | "over" | "not_connected";
   usedCost30d: number;
@@ -165,6 +173,7 @@ export interface UsageCostSnapshot {
   contextWindows: SessionContextWindowSummary[];
   breakdown: UsageBreakdownGroups;
   breakdownToday: UsageBreakdownGroups;
+  monthlyModelTokens: MonthlyModelRow[];
   budget: UsageBudgetStatus;
   subscription: UsageSubscriptionStatus;
   connectors: UsageConnectorStatus;
@@ -592,7 +601,36 @@ export function computeUsageCostSnapshot(
     budget,
     subscription,
     connectors: connectorStatus,
+    monthlyModelTokens: buildMonthlyModelBreakdown(
+      runtime.sourceStatus !== "not_connected" ? runtimeEvents30d : [],
+      runtime.sourceStatus,
+    ),
   };
+}
+
+function buildMonthlyModelBreakdown(
+  events: RuntimeUsageEvent[],
+  sourceStatus: ConnectionStatus,
+): MonthlyModelRow[] {
+  if (sourceStatus === "not_connected" || events.length === 0) return [];
+  const buckets = new Map<string, MonthlyModelRow>();
+  for (const event of events) {
+    const model = event.model?.trim() || "Unknown model";
+    const month = event.day.slice(0, 7); // "YYYY-MM"
+    const key = `${month}::${model}`;
+    const bucket = buckets.get(key) ?? {
+      month,
+      model,
+      tokens: 0,
+      estimatedCost: 0,
+      requests: 0,
+    };
+    bucket.tokens += event.tokens;
+    bucket.estimatedCost += event.cost;
+    bucket.requests += 1;
+    buckets.set(key, bucket);
+  }
+  return [...buckets.values()].sort((a, b) => a.month.localeCompare(b.month) || b.tokens - a.tokens);
 }
 
 async function loadUsageDigests(): Promise<UsageDigest[]> {

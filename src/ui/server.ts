@@ -6212,7 +6212,7 @@ async function renderHtml(
     .slice(0, 3);
   const overviewBusyCardsHtml =
     overviewBusyAgents.length === 0
-      ? `<div class="empty-state">${escapeHtml(t("No staff are carrying live work right now.", "当前没有员工在承担实时工作。"))}</div>`
+      ? ""
       : `<div class="overview-busy-grid">${overviewBusyAgents
           .map((item) => {
             const leadAssignment = item.cronJobNames[0] ?? t("No live assignment", "暂无实时分派");
@@ -6378,21 +6378,34 @@ async function renderHtml(
         ${overviewBusyCardsHtml}
         <script>
         (function(){
-          var AGENT_NAMES = {'main':'龙虾主管','coder':'设计师','secretary':'秘书','product-analyst':'产品分析员','test-controller':'测试员'};
+          var container = document.querySelector('.overview-busy-grid');
+          if(!container) return;
+          var NAMES = {'main':'龙虾主管','coder':'设计师','secretary':'秘书','product-analyst':'产品分析员','test-controller':'测试员'};
+          var lastKey = '';
           setInterval(function(){
             fetch('/api/brain/sessions',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
-              if(!d||!d.sessions)return;
-              var grid = document.querySelector('.overview-busy-grid');
-              if(!grid)return;
-              var active = d.sessions.filter(function(s){return s.state==='running'&&s.agentId;});
-              if(active.length===0)return;
-              var seen = {}, html = '';
-              for(var i=0;i<active.length;i++){
-                var s = active[i]; if(seen[s.agentId])continue; seen[s.agentId]=true;
-                var nm = AGENT_NAMES[s.agentId]||s.agentId;
-                html += '<article class="overview-busy-card"><div class="overview-busy-head"><strong>'+nm+'</strong><span>实时</span></div><div class="overview-busy-copy">'+(s.sessionLabel||'')+'</div><div class="meta">会话 1</div></article>';
+              if(!d||!d.sessions) return;
+              var running = {};
+              for(var i=0;i<d.sessions.length;i++){
+                var s = d.sessions[i];
+                if(s.state==='running'&&s.agentId) running[s.agentId]=true;
               }
-              if(html) grid.innerHTML = html;
+              var key = Object.keys(running).sort().join(',');
+              if(key===lastKey) return;
+              lastKey = key;
+              var cards = container.querySelectorAll('.overview-busy-card');
+              for(var j=0;j<cards.length;j++){
+                var card = cards[j];
+                var nameEl = card.querySelector('strong');
+                var nm = nameEl ? nameEl.textContent : '';
+                var agentId = '';
+                for(var k in NAMES){if(NAMES[k]===nm){agentId=k;break;}}
+                if(agentId&&running[agentId]){
+                  card.style.display='';
+                } else if(agentId){
+                  card.style.display='none';
+                }
+              }
             }).catch(function(){});
           }, 5000);
         })();
@@ -7621,7 +7634,7 @@ async function renderHtml(
     .executive-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 12px; }
     .overview-v3-shell {
       display: grid;
-      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: var(--space-2);
       align-items: stretch;
     }
@@ -7771,7 +7784,14 @@ async function renderHtml(
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--space-2);
-      align-items: start;
+      align-items: stretch;
+    }
+    .overview-decision-grid > .card {
+      min-height: 160px;
+    }
+    .overview-decision-grid > #usage-pulse,
+    .overview-decision-grid > #overview-runtime-checkpoint {
+      grid-column: span 2;
     }
     .overview-kpi-card {
       border: 1px solid var(--card-border);
@@ -8321,6 +8341,51 @@ async function renderHtml(
     .status-chip span { color: #6d6f75; font-size: 12px; letter-spacing: 0.01em; }
     .status-chip strong { font-size: 24px; line-height: 1.08; letter-spacing: -0.02em; color: #1d1d1f; }
     .usage-chip strong { font-size: 22px; }
+    .usage-bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
+      height: 120px;
+      margin-top: 16px;
+      padding: 0 12px;
+    }
+    .usage-bar {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      justify-content: flex-end;
+    }
+    .usage-bar-fill {
+      width: 100%;
+      height: var(--bar-height, 0%);
+      background: linear-gradient(180deg, #4f8cf7, #2563eb);
+      border-radius: 6px 6px 0 0;
+      min-height: 4px;
+      transition: height 0.3s ease;
+    }
+    .usage-bar-label {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #888;
+    }
+    .usage-bar-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .usage-daily-chart {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(0,0,0,0.02);
+      border-radius: 12px;
+    }
+    .usage-daily-chart svg {
+      width: 100%;
+      height: auto;
+    }
     .status-chip small { display: none; }
     .dashboard-strip {
       grid-template-columns: repeat(4, minmax(0, 1fr)) 150px 150px;
@@ -9601,6 +9666,14 @@ async function renderHtml(
     }
     html[data-theme="dark"] #usage-pulse .usage-chip span,
     html[data-theme="dark"] #usage-pulse .usage-chip strong { color: var(--text); }
+    html[data-theme="dark"] .usage-bar-fill {
+      background: linear-gradient(180deg, #60a5fa, #3b82f6);
+    }
+    html[data-theme="dark"] .usage-bar-label { color: #94a3b8; }
+    html[data-theme="dark"] .usage-bar-value { color: #e2e8f0; }
+    html[data-theme="dark"] .usage-daily-chart {
+      background: rgba(255,255,255,0.03);
+    }
     html[data-theme="dark"] .signal-gauge-core {
       background: rgba(12, 18, 29, 0.92);
       border-color: rgba(226, 232, 240, 0.16);
@@ -14912,58 +14985,6 @@ function renderHeaderControlsScript(language: UiLanguage = "zh"): string {
           }
         }
       } catch {} finally { refreshing = false; }
-
-      // Refresh "谁在忙" section
-      try {
-        const resp2 = await fetch("/api/brain/sessions", { cache: "no-store" });
-        const data2 = await resp2.json();
-        if (data2.ok && data2.sessions) {
-          // Update "谁在忙" on overview
-          const busyGrid = document.querySelector('.overview-busy-grid');
-          if (busyGrid) {
-            const activeSessions = data2.sessions.filter(function(s) { return s.state === 'running' && s.agentId; });
-            if (activeSessions.length > 0) {
-              var html = '';
-              var seen = {};
-              for (var i = 0; i < activeSessions.length; i++) {
-                var s = activeSessions[i];
-                if (seen[s.agentId]) continue;
-                seen[s.agentId] = true;
-                var name = {'main':'龙虾主管','coder':'设计师','secretary':'秘书','product-analyst':'产品分析员','test-controller':'测试员'}[s.agentId] || s.agentId;
-                html += '<article class="overview-busy-card">'
-                  + '<div class="overview-busy-head"><strong>' + name + '</strong><span>实时</span></div>'
-                  + '<div class="overview-busy-copy">' + (s.sessionLabel || s.sessionKey || '') + '</div>'
-                  + '<div class="meta">会话 1</div>'
-                  + '</article>';
-              }
-              if (html) busyGrid.innerHTML = html;
-            }
-          }
-          // Update staff page status badges
-          try {
-            document.querySelectorAll('.staff-brief-card, .office-card').forEach(function(card) {
-              try {
-                var agentEl = card.querySelector('[data-agent-id]');
-                if (!agentEl) return;
-                var id = agentEl.getAttribute('data-agent-id') || '';
-                if (!id) return;
-                var agentSessions = data2.sessions.filter(function(s) { return s.agentId === id; });
-                var running = agentSessions.filter(function(s) { return s.state === 'running'; }).length;
-                var badge = card.querySelector('.badge');
-                if (badge) {
-                  if (running > 0) {
-                    badge.textContent = '运行中';
-                    badge.className = 'badge ok';
-                  } else {
-                    badge.textContent = '待命';
-                    badge.className = 'badge';
-                  }
-                }
-              } catch(e) {}
-            });
-          } catch(e) {}
-        }
-      } catch {}
     }, AUTO_REFRESH_MS);
   };
 
@@ -17260,7 +17281,43 @@ function renderUsagePeriodCards(periods: UsageCostSnapshot["periods"], language:
       )}：${escapeHtml(period.pace.label)}</span></div>`;
     })
     .join("");
+
+  // Build bar chart
+  const connectedPeriods = periods.filter((p) => p.sourceStatus !== "not_connected");
+  const maxTokens = connectedPeriods.length > 0 ? Math.max(...connectedPeriods.map((p) => p.tokens)) : 0;
+  function formatTokenBar(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return String(n);
+  }
+  const barChart = periods
+    .map((period) => {
+      const pct = maxTokens > 0 ? Math.round((period.tokens / maxTokens) * 100) : 0;
+      const label = usagePeriodLabel(period.key, period.label, language);
+      const val = period.sourceStatus === "not_connected" ? "—" : formatTokenBar(period.tokens);
+      return `<div class="usage-bar" style="--bar-height: ${pct}%;"><div class="usage-bar-value">${escapeHtml(val)}</div><div class="usage-bar-fill"></div><div class="usage-bar-label">${escapeHtml(label)}</div></div>`;
+    })
+    .join("");
+
   return `<div class="status-strip">${cards}</div>`;
+}
+
+function niceNum(val: number): number {
+  if (val <= 0) return 1;
+  const exp = Math.floor(Math.log10(val));
+  const frac = val / Math.pow(10, exp);
+  let nice: number;
+  if (frac <= 1.5) nice = 2;
+  else if (frac <= 3) nice = 3;
+  else if (frac <= 7) nice = 5;
+  else nice = 10;
+  return nice * Math.pow(10, exp);
+}
+
+function formatShortNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return Math.round(n).toString();
 }
 
 function usagePeriodLabel(key: "today" | "7d" | "30d", fallback: string, language: UiLanguage = "zh"): string {
