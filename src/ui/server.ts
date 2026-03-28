@@ -991,7 +991,7 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
         ).join("");
         const docsHref = buildHomeHref({ quick: "all" }, true, "docs", language);
         const homeHref = buildHomeHref({ quick: "all" }, true, "overview", language);
-        const html = `<!doctype html><html><head><meta charset="utf-8" /><title>${escapeHtml(t("OpenClaw Control Center Docs", "OpenClaw Control Center 文档"))}</title></head><body><h1>${escapeHtml(t("OpenClaw Control Center Docs", "OpenClaw Control Center 文档"))}</h1><ul>${links}</ul><p><a href="${escapeHtml(docsHref)}">${escapeHtml(t("Open document workbench", "打开文档工作台"))}</a> · <a href="${escapeHtml(homeHref)}">${escapeHtml(t("Back to control center", "返回控制中心"))}</a></p></body></html>`;
+        const html = `<!doctype html><html><head><meta charset="utf-8" /><title>${escapeHtml(t("OpenClaw Data Board Docs", "OpenClaw Data Board 文档"))}</title></head><body><h1>${escapeHtml(t("OpenClaw Data Board Docs", "OpenClaw Data Board 文档"))}</h1><ul>${links}</ul><p><a href="${escapeHtml(docsHref)}">${escapeHtml(t("Open document workbench", "打开文档工作台"))}</a> · <a href="${escapeHtml(homeHref)}">${escapeHtml(t("Back to control center", "返回控制中心"))}</a></p></body></html>`;
         return writeText(res, 200, html, "text/html; charset=utf-8");
       }
 
@@ -7144,7 +7144,7 @@ async function renderHtml(
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>OpenClaw Control Center</title>
+  <title>OpenClaw Data Board</title>
   <script>
     (() => {
       const key = 'openclaw:theme';
@@ -10413,7 +10413,7 @@ async function renderHtml(
             </button>
           </div>
         </div>
-        <h1>OpenClaw Control Center</h1>
+        <h1>OpenClaw Data Board</h1>
         <div class="meta">${escapeHtml(t("Updated", "更新时间"))}${escapeHtml(options.language === "en" ? ": " : "：")}${escapeHtml(snapshot.generatedAt ? snapshot.generatedAt : t("Not available", "暂无"))}</div>
         ${languageToggle}
       </div>
