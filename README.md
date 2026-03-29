@@ -1,10 +1,10 @@
-> Chinese reader? Start here: [打开中文 README](README.zh-CN.md)
+> 中文用户请看：[打开中文 README](README.zh-CN.md)
 
-# OpenClaw Control Center
+# OpenClaw Data Board
 
-<img src="docs/assets/overview-hero-en.png" alt="OpenClaw Control Center overview hero screenshot" width="1200" />
+<img src="docs/assets/overview-hero-en.png" alt="OpenClaw Data Board overview hero screenshot" width="1200" />
 
-Turn OpenClaw from a black box into a local control center you can see, trust, and control.
+Turn OpenClaw from a black box into a local dashboard you can see, trust, and control.
 
 Language: **English** | [中文](README.zh-CN.md)
 
@@ -43,10 +43,10 @@ Example UI from a local OpenClaw environment:
 <table>
   <tr>
     <td width="56%">
-      <img src="docs/assets/token-share-en.png" alt="OpenClaw Control Center token attribution screenshot" width="100%" />
+      <img src="docs/assets/token-share-en.png" alt="OpenClaw Data Board token attribution screenshot" width="100%" />
     </td>
     <td width="44%">
-      <img src="docs/assets/staff-en.png" alt="OpenClaw Control Center staff page screenshot" width="100%" />
+      <img src="docs/assets/staff-en.png" alt="OpenClaw Data Board staff page screenshot" width="100%" />
     </td>
   </tr>
   <tr>
@@ -58,10 +58,10 @@ Example UI from a local OpenClaw environment:
 <table>
   <tr>
     <td width="56%">
-      <img src="docs/assets/collaboration-en.png" alt="OpenClaw Control Center collaboration screenshot" width="100%" />
+      <img src="docs/assets/collaboration-en.png" alt="OpenClaw Data Board collaboration screenshot" width="100%" />
     </td>
     <td width="44%">
-      <img src="docs/assets/settings-insights-en.png" alt="OpenClaw Control Center security and update status screenshot" width="100%" />
+      <img src="docs/assets/settings-insights-en.png" alt="OpenClaw Data Board security and update status screenshot" width="100%" />
     </td>
   </tr>
   <tr>
@@ -173,8 +173,8 @@ For the richest dashboard data, it also helps if this machine has:
 
 ### 2. Install the project
 ```bash
-git clone https://github.com/TianyiDataScience/openclaw-control-center.git
-cd openclaw-control-center
+git clone https://github.com/young-nights/openclaw-data-board.git
+cd openclaw-data-board
 npm install
 cp .env.example .env
 ```
@@ -186,7 +186,7 @@ If OpenClaw claims the repo is missing `src/runtime` or other core source files,
 - `.env.example`
 
 That error usually means:
-- the current directory is not the `openclaw-control-center` repo root
+- the current directory is not the `openclaw-data-board` repo root
 - the wrong repo was cloned
 - the checkout/download is incomplete
 - the agent is running in the wrong workspace
@@ -219,12 +219,12 @@ This install instruction already accounts for common real-world differences such
 Copy the full block below into OpenClaw:
 
 ```text
-You are installing and connecting OpenClaw Control Center to this machine's OpenClaw environment.
+You are installing and connecting OpenClaw Data Board to this machine's OpenClaw environment.
 
 Your goal is not to explain theory. Your goal is to complete a safe first-run setup end to end.
 
 Hard rules:
-1. Work only inside the control-center repository.
+1. Work only inside the data-board repository.
 2. Do not modify application source code unless I explicitly ask.
 3. Do not modify OpenClaw's own config files.
 4. Do not enable live import or approval mutations.
@@ -246,7 +246,7 @@ Phase 1: inspect the environment
 8. Do not assume any fixed agent names. If `openclaw.json` is readable, treat it as the source of truth.
 
 Phase 2: install the project
-9. Confirm that the current directory is the control-center repo root.
+9. Confirm that the current directory is the data-board repo root.
 10. Verify the repo is complete before editing anything.
 11. If core paths are missing, stop and re-clone the official repo.
 12. Run dependency install.

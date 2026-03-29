@@ -1,8 +1,8 @@
 > Looking for English? Start here: [Open the English README](README.md)
 
-# OpenClaw Control Center
+# OpenClaw Data Board
 
-<img src="docs/assets/overview-hero-zh.png" alt="OpenClaw Control Center 总览横幅截图" width="1200" />
+<img src="docs/assets/overview-hero-zh.png" alt="OpenClaw Data Board 总览横幅截图" width="1200" />
 
 把 OpenClaw 从黑箱变成一个看得清、信得过、控得住的本地控制中心。
 
@@ -43,10 +43,10 @@
 <table>
   <tr>
     <td width="56%">
-      <img src="docs/assets/token-share-zh.png" alt="OpenClaw Control Center 中文 token 消耗归因截图" width="100%" />
+      <img src="docs/assets/token-share-zh.png" alt="OpenClaw Data Board 中文 token 消耗归因截图" width="100%" />
     </td>
     <td width="44%">
-      <img src="docs/assets/staff-zh.png" alt="OpenClaw Control Center 中文员工页截图" width="100%" />
+      <img src="docs/assets/staff-zh.png" alt="OpenClaw Data Board 中文员工页截图" width="100%" />
     </td>
   </tr>
   <tr>
@@ -58,10 +58,10 @@
 <table>
   <tr>
     <td width="56%">
-      <img src="docs/assets/collaboration-zh.png" alt="OpenClaw Control Center 中文协作页截图" width="100%" />
+      <img src="docs/assets/collaboration-zh.png" alt="OpenClaw Data Board 中文协作页截图" width="100%" />
     </td>
     <td width="44%">
-      <img src="docs/assets/settings-insights-zh.png" alt="OpenClaw Control Center 中文安全与更新状态截图" width="100%" />
+      <img src="docs/assets/settings-insights-zh.png" alt="OpenClaw Data Board 中文安全与更新状态截图" width="100%" />
     </td>
   </tr>
   <tr>
@@ -173,8 +173,8 @@ npm run dev:ui
 
 ### 2. 安装项目
 ```bash
-git clone https://github.com/TianyiDataScience/openclaw-control-center.git
-cd openclaw-control-center
+git clone https://github.com/young-nights/openclaw-data-board.git
+cd openclaw-data-board
 npm install
 cp .env.example .env
 ```
@@ -186,7 +186,7 @@ cp .env.example .env
 - `.env.example`
 
 这类报错通常意味着：
-- 当前目录不是 `openclaw-control-center` 仓库根目录
+- 当前目录不是 `openclaw-data-board` 仓库根目录
 - clone 到了错误仓库
 - checkout / 下载不完整
 - agent 在错误 workspace 里执行
@@ -219,12 +219,12 @@ cp .env.example .env
 直接把下面整段原样交给 OpenClaw：
 
 ```text
-你现在要帮我把 OpenClaw Control Center 安装并接到这台机器自己的 OpenClaw 环境上。
+你现在要帮我把 OpenClaw Data Board 安装并接到这台机器自己的 OpenClaw 环境上。
 
 你的目标不是解释原理，而是直接完成一次安全的首次接入。
 
 严格约束：
-1. 只允许在 control-center 仓库里工作。
+1. 只允许在 data-board 仓库里工作。
 2. 除非我明确要求，否则不要修改应用源码。
 3. 不要修改 OpenClaw 自己的配置文件。
 4. 不要开启 live import，不要开启 approval mutation。
@@ -246,7 +246,7 @@ cp .env.example .env
 8. 不要假设任何固定 agent 名称。若 `openclaw.json` 可读，就以它为准。
 
 第二阶段：安装项目
-9. 确认当前目录是 control-center 仓库根目录。
+9. 确认当前目录是 data-board 仓库根目录。
 10. 先确认仓库本体完整。
 11. 如果缺少 `src/runtime`、`src/ui` 或 `package.json`，不要继续安装，直接重新 clone 官方仓库。
 12. 运行依赖安装。
