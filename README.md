@@ -2,8 +2,6 @@
 
 # OpenClaw Data Board
 
-<img src="docs/assets/overview-hero-en.png" alt="OpenClaw Data Board overview hero screenshot" width="1200" />
-
 Turn OpenClaw from a black box into a local dashboard you can see, trust, and control.
 
 Language: **English** | [中文](README.zh-CN.md)
