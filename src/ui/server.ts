@@ -11129,10 +11129,16 @@ function extractLabeledField(input: string, labels: string[]): string | undefine
     if (!line) continue;
     const lower = line.toLowerCase();
     for (const label of labels) {
-      const prefix = `${label.toLowerCase()}:`;
-      if (!lower.startsWith(prefix)) continue;
-      const value = line.slice(prefix.length).trim();
-      if (value) return value;
+      const prefixHalf = `${label.toLowerCase()}:`;
+      const prefixFull = `${label.toLowerCase()}：`;
+      if (lower.startsWith(prefixHalf)) {
+        const value = line.slice(prefixHalf.length).trim();
+        if (value) return value;
+      }
+      if (lower.startsWith(prefixFull)) {
+        const value = line.slice(prefixFull.length).trim();
+        if (value) return value;
+      }
     }
   }
   return undefined;
@@ -11255,6 +11261,22 @@ async function resolveStaffRoleLabel(member: TeamMemberSnapshot, language: UiLan
     return pickUiText(language, "Coding automation", "自动化编码执行");
   }
 
+  if (key === "coder") {
+    return pickUiText(language, "Code implementation and scripting", "代码实现与脚本编写");
+  }
+
+  if (key === "secretary") {
+    return pickUiText(language, "Life assistant and daily affairs", "生活助理与日常事务");
+  }
+
+  if (key === "product-analyst" || key === "productanalyst") {
+    return pickUiText(language, "Data analysis and market research", "数据分析与市场调研");
+  }
+
+  if (key === "evaluator") {
+    return pickUiText(language, "Code quality evaluation and testing", "代码质量评估与测试");
+  }
+
   const explicit = `${explicitRole} ${explicitMission}`.trim();
   if (
     explicit &&
@@ -11267,6 +11289,10 @@ async function resolveStaffRoleLabel(member: TeamMemberSnapshot, language: UiLan
   }
   if (explicit && (normalizeEvidenceText(explicit).includes("creator") || explicit.includes("创作"))) {
     return pickUiText(language, "High-value content creation", "高价值内容创作");
+  }
+
+  if (explicit) {
+    return explicit.length > 40 ? explicit.slice(0, 38) + "…" : explicit;
   }
 
   return pickUiText(language, "Role not defined in workspace", "工作区未写明职责");
