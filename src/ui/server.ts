@@ -3566,7 +3566,7 @@ function renderOpenClawConnectionCard(
       <a class="btn" href="${escapeHtml(buildHomeHref({ quick: "all" }, true, "settings", language))}">${escapeHtml(
         pickUiText(language, "Open settings", "查看设置"),
       )}</a>
-      <a class="btn" href="https://app.openclaw.ai" target="_blank" rel="noopener noreferrer">${escapeHtml(
+      <a class="btn" href="http://127.0.0.1:18789" target="_blank" rel="noopener noreferrer">${escapeHtml(
         pickUiText(language, "OpenClaw Dashboard ↗", "OpenClaw 官方面板 ↗"),
       )}</a>
     </div>
