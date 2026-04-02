@@ -1472,6 +1472,7 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
           coder: "设计师",
           secretary: "秘书",
           "product-analyst": "产品分析员",
+          evaluator: "评估员",
           "test-controller": "测试员",
         };
 
@@ -1479,8 +1480,9 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
           const agentId = session.agentId ?? "";
           const identity = deriveAgentAnimalIdentity(agentId);
           const isSubagent = session.sessionKey?.includes(":subagent:") ?? false;
-          const displayName = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? agentId ?? "Agent");
-          const roleLabel = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? "助手");
+          const isPermanentAgent = !!agentDisplayNames[agentId];
+          const displayName = isPermanentAgent ? agentDisplayNames[agentId] : (isSubagent ? "临时员工" : (agentId ?? "Agent"));
+          const roleLabel = isPermanentAgent ? agentDisplayNames[agentId] : (isSubagent ? "临时员工" : "助手");
           sessionMeta.set(session.sessionKey, {
             label: session.label ?? session.sessionKey,
             agentId,
@@ -1555,15 +1557,17 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
               coder: "设计师",
               secretary: "秘书",
               "product-analyst": "产品分析员",
-          "test-controller": "测试员",
+              evaluator: "评估员",
+              "test-controller": "测试员",
             };
 
             for (const session of snapshot.sessions) {
               const agentId = session.agentId ?? "";
               const identity = deriveAgentAnimalIdentity(agentId);
               const isSubagent = session.sessionKey?.includes(":subagent:") ?? false;
-              const displayName = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? agentId ?? "Agent");
-              const roleLabel = isSubagent ? "临时助手" : (agentDisplayNames[agentId] ?? "助手");
+              const isPermanentAgent = !!agentDisplayNames[agentId];
+              const displayName = isPermanentAgent ? agentDisplayNames[agentId] : (isSubagent ? "临时员工" : (agentId ?? "Agent"));
+              const roleLabel = isPermanentAgent ? agentDisplayNames[agentId] : (isSubagent ? "临时员工" : "助手");
               sessionMeta.set(session.sessionKey, {
                 label: session.label ?? session.sessionKey,
                 agentId,
