@@ -23,7 +23,7 @@
     if (chartArea) {
       const cr = chartArea.getBoundingClientRect();
       const br = el.getBoundingClientRect();
-      tooltipX = br.left - cr.left + br.width / 2;
+      tooltipX = br.left - cr.left + br.width;
       tooltipY = br.top - cr.top;
     }
   }
@@ -470,7 +470,7 @@
     position: absolute;
     left: var(--tx);
     top: var(--ty);
-    transform: translate(-50%, -100%);
+    transform: translateY(-100%);
     margin-top: -8px;
     z-index: 100;
     pointer-events: none;
