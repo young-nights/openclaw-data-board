@@ -324,7 +324,7 @@
 
   /* Chart */
   .chart-wrapper {
-    overflow: hidden;
+    overflow: visible;
     margin-bottom: 20px;
   }
 
@@ -473,7 +473,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    overflow: hidden;
+    overflow: visible;
   }
 
   .tooltip-date {
