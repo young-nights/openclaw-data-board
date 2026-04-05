@@ -122,17 +122,13 @@
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
     const target = e.currentTarget as HTMLElement;
-    const chartArea = target.closest('.chart-area');
-    if (target && chartArea) {
-      const barRect = target.getBoundingClientRect();
-      const chartRect = chartArea.getBoundingClientRect();
-      tooltipX = barRect.left - chartRect.left + barRect.width / 2;
-      tooltipY = barRect.top - chartRect.top;
-    }
+    const rect = target.getBoundingClientRect();
+    tooltipX = rect.left + rect.width / 2;
+    tooltipY = rect.top;
   }
 
   function moveTooltip(e: MouseEvent) {
-    // Tooltip position is set on enter, no need to update on move
+    // Position set on enter
   }
 
   function hideTooltip() { tooltipDay = null; }
@@ -465,7 +461,7 @@
 
   /* Tooltip - attached to bar */
   .tooltip {
-    position: absolute;
+    position: fixed;
     left: var(--tooltip-x);
     top: var(--tooltip-y);
     transform: translate(-50%, -100%);
