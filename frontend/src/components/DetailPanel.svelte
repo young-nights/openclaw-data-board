@@ -121,18 +121,14 @@
 
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
-    const target = e.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    tooltipX = rect.left + rect.width / 2;
-    tooltipY = rect.top + rect.height / 2;
+    tooltipX = e.clientX;
+    tooltipY = e.clientY;
   }
 
   function moveTooltip(e: MouseEvent) {
     if (tooltipDay !== null) {
-      const target = e.currentTarget as HTMLElement;
-      const rect = target.getBoundingClientRect();
-      tooltipX = rect.left + rect.width / 2;
-      tooltipY = rect.top + rect.height / 2;
+      tooltipX = e.clientX;
+      tooltipY = e.clientY;
     }
   }
 
@@ -464,10 +460,10 @@
     border-radius: 4px 4px 0 0;
   }
 
-  /* Tooltip - beside bar */
+  /* Tooltip - follow mouse */
   .tooltip {
     position: fixed;
-    left: calc(var(--tooltip-x) + 6px);
+    left: calc(var(--tooltip-x) + 16px);
     top: var(--tooltip-y);
     transform: translateY(-50%);
     z-index: 100;
