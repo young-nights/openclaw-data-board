@@ -467,12 +467,12 @@
   /* Tooltip - beside bar */
   .tooltip {
     position: fixed;
-    left: calc(var(--tooltip-x) + 12px);
+    left: calc(var(--tooltip-x) + 6px);
     top: var(--tooltip-y);
     transform: translateY(-50%);
     z-index: 100;
     pointer-events: none;
-    min-width: 180px;
+    min-width: 160px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
     border-radius: 10px;
     overflow: hidden;
