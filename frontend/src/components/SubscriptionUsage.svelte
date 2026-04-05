@@ -74,8 +74,8 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     return data.map((v, i) => {
-      const x = 40 + (i / (data.length - 1)) * 320;
-      const y = 90 - (v / maxVal) * 70;
+      const x = 30 + (i / (data.length - 1)) * 340;
+      const y = 80 - (v / maxVal) * 60;
       return `${x},${y}`;
     }).join(' ');
   }
@@ -84,8 +84,8 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     const pts = data.map((v, i) => {
-      const x = 40 + (i / (data.length - 1)) * 320;
-      const y = 90 - (v / maxVal) * 70;
+      const x = 30 + (i / (data.length - 1)) * 340;
+      const y = 80 - (v / maxVal) * 60;
       return `${x},${y}`;
     });
     return `${pts[0].split(',')[0]},90 ${pts.join(' ')} ${pts[pts.length-1].split(',')[0]},90`;
@@ -95,8 +95,8 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     return data.map((v, i) => ({
-      x: 40 + (i / (data.length - 1)) * 320,
-      y: 90 - (v / maxVal) * 70,
+      x: 30 + (i / (data.length - 1)) * 340,
+      y: 80 - (v / maxVal) * 60,
       v
     }));
   }
@@ -244,32 +244,27 @@
                     <div class="detail-section">
                       <div class="detail-title">{t('Daily Requests (Last 7 Days)', '每日请求数（近 7 天）')}</div>
                       <div class="line-chart-wrap">
-                        <svg viewBox="0 0 400 120" class="line-chart-svg">
+                        <svg viewBox="0 0 400 130" class="line-chart-svg">
+                          <!-- Grid -->
                           {#each [0, 25, 50, 75, 100] as pct}
                             <line x1="30" y1={90 - pct * 0.7} x2="370" y2={90 - pct * 0.7} stroke="#f3f4f6" stroke-width="1" />
                           {/each}
-                          <polyline
-                            fill="none"
-                            stroke="#3b82f6"
-                            stroke-width="2"
-                            stroke-linejoin="round"
-                            stroke-linecap="round"
-                            points={getLinePoints(row.agent)}
-                          />
-                          <polygon
-                            fill="rgba(59, 130, 246, 0.08)"
-                            points={getAreaPoints(row.agent)}
-                          />
+                          <!-- Line -->
+                          <polyline fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points={getLinePoints(row.agent)} />
+                          <!-- Area -->
+                          <polygon fill="rgba(59, 130, 246, 0.06)" points={getAreaPoints(row.agent)} />
+                          <!-- Points + Labels + Values -->
                           {#each getPointData(row.agent) as p}
-                            <circle cx={p.x} cy={p.y} r="4" fill="#3b82f6" stroke="#ffffff" stroke-width="2" />
-                            <text x={p.x} y={p.y - 10} text-anchor="middle" font-size="10" fill="#111827" font-weight="700">{p.v}</text>
+                            <line x1={p.x} y1={p.y} x2={p.x} y2="90" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,2" />
+                            <circle cx={p.x} cy={p.y} r="4.5" fill="#3b82f6" stroke="#ffffff" stroke-width="2.5" />
+                            <text x={p.x} y={p.y - 10} text-anchor="middle" font-size="10" fill="#111827" font-weight="700" font-family="SF Mono, monospace">{p.v}</text>
+                          {/each}
+                          <!-- X Labels -->
+                          {#each weekLabels as label, i}
+                            {@const x = 30 + (i / (weekLabels.length - 1)) * 340}
+                            <text x={x} y="115" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">{label}</text>
                           {/each}
                         </svg>
-                        <div class="line-chart-labels">
-                          {#each weekLabels as label, i}
-                            <span style="left: {10 + (i / (weekLabels.length - 1)) * 80}%">{label}</span>
-                          {/each}
-                        </div>
                       </div>
                     </div>
                     <div class="detail-stats">
@@ -471,9 +466,7 @@
   .detail-section { margin-bottom: 16px; }
   .detail-title { font-size: 15px; font-weight: 700; color: #374151; margin-bottom: 12px; }
   .line-chart-wrap { margin-bottom: 16px; }
-  .line-chart-svg { width: 100%; height: 100px; }
-  .line-chart-labels { position: relative; height: 16px; font-size: 11px; color: #6b7280; font-weight: 500; }
-  .line-chart-labels span { position: absolute; transform: translateX(-50%); text-align: center; }
+  .line-chart-svg { width: 100%; height: 130px; }
   .detail-stats { display: flex; gap: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; }
   .detail-stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-label { font-size: 13px; color: #9ca3af; font-weight: 500; }
