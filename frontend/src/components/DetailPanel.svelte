@@ -211,7 +211,7 @@
         <!-- Tooltip -->
         {#if tooltipDay !== null}
           <div class="tooltip" style="--tx: {tooltipX}px; --ty: {tooltipY}px">
-            <div class="tooltip-date">{dayLabels[tooltipDay]}</div>
+            <div class="tooltip-date">{dayLabels[tooltipDay]}, 2026 at 8:00 AM</div>
             <div class="tooltip-body">
               {#each currentModels as model}
                 {#if model.data[tooltipDay] > 0}
@@ -462,10 +462,10 @@
     position: fixed;
     left: 0;
     top: 0;
-    transform: translate(8px, calc(var(--ty) - 50%));
+    transform: translate(4px, calc(var(--ty) - 50%));
     z-index: 100;
     pointer-events: none;
-    min-width: 180px;
+    min-width: 220px;
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
