@@ -116,20 +116,23 @@
   // Tooltip
   let tooltipDay = $state<number | null>(null);
   let tooltipEl = $state<HTMLElement | null>(null);
+  let tooltipX = $state(0);
+  let tooltipY = $state(0);
 
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
-    const target = e.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    const container = target.closest('.chart-area')?.getBoundingClientRect();
-    if (container) {
-      tooltipX = rect.left - container.left + rect.width / 2;
+    tooltipX = e.clientX;
+    tooltipY = e.clientY;
+  }
+
+  function moveTooltip(e: MouseEvent) {
+    if (tooltipDay !== null) {
+      tooltipX = e.clientX;
+      tooltipY = e.clientY;
     }
   }
 
   function hideTooltip() { tooltipDay = null; }
-
-  let tooltipX = $state(0);
 
   function formatVal(v: number): string {
     if (viewType === 'spend') return `$${v < 0.01 ? v.toFixed(3) : v.toFixed(2)}`;
@@ -227,7 +230,7 @@
 
         <!-- Tooltip -->
         {#if tooltipDay !== null}
-          <div class="tooltip" style="left: {tooltipX}px">
+          <div class="tooltip" style="left: {tooltipX}px; top: {tooltipY}px">
             <div class="tooltip-date">{dayLabels[tooltipDay]}</div>
             <div class="tooltip-body">
               {#each currentModels as model}
@@ -447,28 +450,29 @@
 
   /* Tooltip - reference style */
   .tooltip {
-    position: absolute;
-    top: -12px;
-    transform: translateX(-50%);
-    z-index: 10;
+    position: fixed;
+    transform: translate(-50%, -100%);
+    margin-top: -12px;
+    z-index: 100;
     pointer-events: none;
     min-width: 180px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
     overflow: hidden;
   }
 
   .tooltip-date {
-    background: rgba(17, 24, 39, 0.9);
+    background: #111827;
     color: #ffffff;
     font-size: 12px;
     font-weight: 600;
     padding: 6px 12px;
+    text-align: center;
   }
 
   .tooltip-body {
     background: #ffffff;
-    padding: 10px 12px;
+    padding: 10px 14px;
   }
 
   .tooltip-row {
@@ -476,7 +480,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    padding: 3px 0;
+    padding: 4px 0;
   }
 
   .tooltip-line {
@@ -489,6 +493,7 @@
   .tooltip-model-name {
     flex: 1;
     color: #374151;
+    font-weight: 500;
   }
 
   .tooltip-value {
@@ -500,7 +505,7 @@
 
   .tooltip-total {
     margin-top: 6px;
-    padding-top: 6px;
+    padding-top: 8px;
     border-top: 1px solid #e5e7eb;
     font-size: 13px;
     color: #6b7280;
@@ -510,6 +515,7 @@
   .tooltip-total strong {
     color: #111827;
     font-family: 'SF Mono', monospace;
+    font-weight: 700;
   }
 
   /* X Axis */
