@@ -241,13 +241,6 @@
         </div>
 
 
-              {/each}
-                <span>Total</span>
-              </div>
-            </div>
-          </div>
-        {/if}
-
         <!-- X Axis -->
         <div class="x-axis">
           {#each dayLabels as label, i}
@@ -255,11 +248,9 @@
           {/each}
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Table -->
-  <div class="table-container">
+      <!-- Table -->
+      <div class="table-container">
     <table class="detail-table">
       <thead>
         <tr>
@@ -295,6 +286,8 @@
         {/each}
       </tbody>
     </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -363,8 +356,7 @@
 
   .chart-container {
     display: flex;
-    gap: 0;
-    height: 420px;
+    flex-direction: column;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
     background: #fafafa;
