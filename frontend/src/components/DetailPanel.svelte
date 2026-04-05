@@ -136,16 +136,22 @@
   let tooltipX = $state(0);
   let tooltipY = $state(0);
 
+  let hoveredModel = $state<string | null>(null);
+
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
-    tooltipX = rect.left + rect.width / 2;
-    tooltipY = rect.top;
+    tooltipX = rect.right + 10;
+    tooltipY = rect.top + rect.height / 2;
   }
 
   function moveTooltip(e: MouseEvent) {
     // Position set on enter
+  }
+
+  function highlightModel(modelName: string | null) {
+    hoveredModel = modelName;
   }
 
   function hideTooltip() { tooltipDay = null; }
@@ -238,7 +244,13 @@
               <div class="bar-stack" style="height: {Math.min(pct, 100)}%">
                 {#each currentModels.slice().reverse() as model}
                   {@const mpct = yMax > 0 ? (model.data[i] / yMax) * 100 : 0}
-                  <div class="bar-segment" style="height: {Math.min(mpct, 100)}%; background: {model.color}"></div>
+                  <div class="bar-segment" 
+                    style="height: {Math.min(mpct, 100)}%; background: {model.color}"
+                    class:dimmed={hoveredModel !== null && hoveredModel !== model.name}
+                    class:highlighted={hoveredModel === model.name}
+                    onmouseenter={() => highlightModel(model.name)}
+                    onmouseleave={() => highlightModel(null)}
+                  ></div>
                 {/each}
               </div>
             </div>
@@ -252,7 +264,7 @@
             <div class="tooltip-body">
               {#each currentModels as model}
                 {#if model.data[tooltipDay] > 0}
-                  <div class="tooltip-row">
+                  <div class="tooltip-row" class:highlighted={hoveredModel === model.name}>
                     <span class="tooltip-line" style="background: {model.color}"></span>
                     <span class="tooltip-model-name">{model.name}</span>
                     <strong class="tooltip-value">{formatVal(model.data[tooltipDay])}</strong>
@@ -469,42 +481,55 @@
   .bar-segment {
     width: 100%;
     min-height: 0;
-    transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 150ms, opacity 150ms;
+    cursor: pointer;
   }
 
   .bar-segment:first-child {
     border-radius: 4px 4px 0 0;
   }
 
-  /* Tooltip - above bar, centered on X-axis */
+  .bar-segment:hover {
+    filter: brightness(1.15);
+  }
+
+  .bar-segment.dimmed {
+    filter: brightness(0.85);
+    opacity: 0.5;
+  }
+
+  .bar-segment.highlighted {
+    filter: brightness(1.2);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3);
+  }
+
+  /* Tooltip - beside bar */
   .tooltip {
     position: fixed;
     left: var(--tooltip-x);
     top: var(--tooltip-y);
-    transform: translate(-50%, -100%);
-    margin-top: -16px;
+    transform: translate(0, -50%);
     z-index: 100;
     pointer-events: none;
-    min-width: 170px;
+    min-width: 180px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #e5e7eb;
   }
 
-  /* Dot indicator connecting to bar */
-  .tooltip::after {
+  /* Arrow pointing to bar */
+  .tooltip::before {
     content: '';
     position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 8px;
-    height: 8px;
-    background: #1f2937;
-    border-radius: 50%;
-    border: 2px solid #ffffff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid #1f2937;
   }
 
   .tooltip-date {
@@ -526,7 +551,13 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    padding: 4px 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 150ms;
+  }
+
+  .tooltip-row.highlighted {
+    background: #f3f4f6;
   }
 
   .tooltip-line {
