@@ -2,9 +2,10 @@
 <script lang="ts">
   import type { UiLanguage } from '../types';
 
-  let { viewType, language, onClose }: {
+  let { viewType, language, timeRange, onClose }: {
     viewType: 'spend' | 'requests' | 'tokens';
     language: UiLanguage;
+    timeRange: string;
     onClose: () => void;
   } = $props();
 
@@ -23,14 +24,29 @@
   };
   const cfg = $derived(config[viewType]);
 
-  // Daily data - one bar per day (30 days)
-  const dayLabels = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(2026, 2, 6 + i);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 8:00 AM';
-  });
+  // Generate labels and data based on timeRange
+  function getLabelsAndCount(range: string): { labels: string[]; count: number } {
+    if (range === '1h') return { labels: Array.from({ length: 12 }, (_, i) => `${i * 5}m`), count: 12 };
+    if (range === '1d') return { labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), count: 24 };
+    if (range === '7d') {
+      return {
+        labels: Array.from({ length: 7 }, (_, i) => new Date(2026, 3, 1 + i).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 8:00 AM'),
+        count: 7
+      };
+    }
+    if (range === '1m') {
+      return {
+        labels: Array.from({ length: 30 }, (_, i) => new Date(2026, 2, 6 + i).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 8:00 AM'),
+        count: 30
+      };
+    }
+    return { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], count: 12 };
+  }
+
+  const { labels: dayLabels, count: barCount } = $derived(getLabelsAndCount(timeRange));
 
   function genDaily(base: number, spike: number, spikeDay: number): number[] {
-    return dayLabels.map((_, i) => {
+    return Array.from({ length: barCount }, (_, i) => {
       if (i < spikeDay - 5) return Math.round(base * (0.3 + Math.random() * 0.7));
       if (i < spikeDay) return Math.round(base * (1 + (i - spikeDay + 5) * 0.4));
       if (i === spikeDay) return spike;
@@ -147,9 +163,10 @@
     URL.revokeObjectURL(url);
   }
 
-  // X-axis: show every 7th label (weekly)
+  // X-axis: show labels based on count
   function shouldShowLabel(idx: number): boolean {
-    return idx % 7 === 0 || idx === dayLabels.length - 1;
+    if (barCount <= 12) return true; // show all for small counts
+    return idx % Math.ceil(barCount / 8) === 0 || idx === dayLabels.length - 1;
   }
 </script>
 
@@ -496,7 +513,7 @@
 
   .x-label {
     flex: 1;
-    font-size: 11px;
+    font-size: 10px;
     color: #9ca3af;
     text-align: center;
     white-space: nowrap;

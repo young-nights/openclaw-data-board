@@ -84,20 +84,54 @@
   const requestsModels = $derived(allModels.filter(m => m.requests > 0 && selectedModels.has(m.name)).map(m => ({ name: m.name, value: formatNum(m.requests), color: m.color })));
   const tokensModels = $derived(allModels.filter(m => m.tokens > 0 && selectedModels.has(m.name)).map(m => ({ name: m.name, value: formatNum(m.tokens), color: m.color })));
 
-  // Mini chart data (30 days, oldest left → newest right)
-  function genMiniData(spike: number, spikeDay: number): number[] {
-    return Array.from({ length: 30 }, (_, i) => {
-      if (i < spikeDay - 5) return Math.round(spike * 0.1 * (0.3 + Math.random() * 0.7));
-      if (i < spikeDay) return Math.round(spike * 0.1 * (1 + (i - spikeDay + 5) * 0.4));
-      if (i === spikeDay) return spike;
-      if (i < spikeDay + 5) return Math.round(spike * (0.2 + Math.random() * 0.3));
-      return Math.round(spike * (0.3 + Math.random() * 0.4));
+  // Mini chart data - adapts to time range
+  // 1h: 12 points (5min intervals), 1d: 24 points (hourly), 7d: 7 points (daily), 1m: 30 points (daily), 1y: 12 points (monthly)
+  function genMiniData(spike: number, spikeIdx: number, points: number): number[] {
+    return Array.from({ length: points }, (_, i) => {
+      const dist = Math.abs(i - spikeIdx);
+      if (dist > 5) return Math.round(spike * 0.08 * (0.3 + Math.random() * 0.7));
+      if (dist > 2) return Math.round(spike * 0.08 * (1 + (5 - dist) * 0.3));
+      if (dist <= 2 && i === spikeIdx) return spike;
+      return Math.round(spike * (0.15 + Math.random() * 0.25));
     });
   }
 
-  const spendChartData = genMiniData(8, 28);
-  const requestsChartData = genMiniData(350, 28);
-  const tokensChartData = genMiniData(65000, 28);
+  function getPointCount(range: string): number {
+    if (range === '1h') return 12;
+    if (range === '1d') return 24;
+    if (range === '7d') return 7;
+    if (range === '1m') return 30;
+    return 12; // 1y
+  }
+
+  const pointCount = $derived(getPointCount(timeRange));
+  const hasData = $derived(timeRange !== '1h'); // 1h = no data for demo
+
+  const spendChartData = $derived(hasData ? genMiniData(8, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
+  const requestsChartData = $derived(hasData ? genMiniData(350, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
+  const tokensChartData = $derived(hasData ? genMiniData(65000, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
+
+  // X-axis labels based on time range
+  function getXLabels(range: string): string[] {
+    if (range === '1h') return Array.from({ length: 12 }, (_, i) => `${i * 5}m`);
+    if (range === '1d') return Array.from({ length: 24 }, (_, i) => `${i}:00`);
+    if (range === '7d') {
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(2026, 3, 1 + i);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      });
+    }
+    if (range === '1m') {
+      return Array.from({ length: 30 }, (_, i) => {
+        const d = new Date(2026, 2, 6 + i);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      });
+    }
+    // 1y
+    return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  }
+
+  const xLabels = $derived(getXLabels(timeRange));
 
   function handleRefresh() { lastUpdated = new Date(); }
   function formatTime(date: Date): string {
@@ -206,7 +240,7 @@
   {#if detailView}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="detail-overlay" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('detail-overlay')) detailView = null; }}>
-      <DetailPanel viewType={detailView} {language} onClose={() => detailView = null} />
+      <DetailPanel viewType={detailView} {language} {timeRange} onClose={() => detailView = null} />
     </div>
   {/if}
 

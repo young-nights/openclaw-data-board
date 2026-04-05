@@ -20,6 +20,7 @@
 
   const c = $derived(colorMap[color]);
   const maxVal = $derived(chartData ? Math.max(...chartData) : 1);
+  const hasData = $derived(maxVal > 0);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -37,7 +38,6 @@
       <div class="skeleton-line" style="width: 70%;"></div>
     </div>
   {:else}
-    <!-- Header - compact -->
     <div class="card-header">
       <span class="card-title">{title}</span>
       {#if onClick}
@@ -45,22 +45,22 @@
       {/if}
     </div>
 
-    <!-- Main Value - smaller to give chart space -->
     <div class="card-value">{value}</div>
 
-    <!-- Mini Chart - takes most of card space -->
     {#if chartData && chartData.length > 0}
-      <div class="mini-chart">
+      <div class="mini-chart" class:no-data={!hasData}>
         {#each chartData as val}
           <div
             class="mini-bar"
-            style="height: {maxVal > 0 ? (val / maxVal) * 100 : 0}%; background: {c.accent}"
+            style="height: {hasData ? (val / maxVal) * 100 : 15}%; background: {hasData ? c.accent : '#d1d5db'}"
           ></div>
         {/each}
       </div>
+      {#if !hasData}
+        <div class="no-data">No data in this window</div>
+      {/if}
     {/if}
 
-    <!-- Model Breakdown -->
     {#if modelBreakdown && modelBreakdown.length > 0}
       <div class="model-list">
         {#each modelBreakdown as model}
@@ -78,7 +78,6 @@
       </div>
     {/if}
 
-    <!-- Subtitle -->
     <div class="card-subtitle">{subtitle}</div>
   {/if}
 </div>
@@ -97,9 +96,7 @@
     flex-direction: column;
   }
 
-  .metric-card.clickable {
-    cursor: pointer;
-  }
+  .metric-card.clickable { cursor: pointer; }
 
   .metric-card:hover {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -113,124 +110,65 @@
     margin-bottom: 4px;
   }
 
-  .card-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: #6b7280;
-  }
+  .card-title { font-size: 13px; font-weight: 500; color: #6b7280; }
 
   .expand-btn {
-    background: none;
-    border: none;
-    color: #9ca3af;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 4px;
-    border-radius: 6px;
-    transition: all 120ms;
+    background: none; border: none; color: #9ca3af; cursor: pointer;
+    font-size: 14px; padding: 4px; border-radius: 6px; transition: all 120ms;
   }
 
-  .expand-btn:hover {
-    background: #f3f4f6;
-    color: #374151;
-  }
+  .expand-btn:hover { background: #f3f4f6; color: #374151; }
 
   .card-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #111827;
-    line-height: 1.1;
-    margin-bottom: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    font-size: 28px; font-weight: 700; color: #111827; line-height: 1.1;
+    margin-bottom: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
     letter-spacing: -0.02em;
   }
 
-  /* Mini Chart - takes most of card space */
   .mini-chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    flex: 1;
-    min-height: 100px;
-    margin-bottom: 16px;
-    padding: 0 2px;
+    display: flex; align-items: flex-end; gap: 2px;
+    flex: 1; min-height: 100px; margin-bottom: 16px; padding: 0 2px;
+  }
+
+  .mini-chart.no-data {
+    align-items: center;
+    opacity: 0.5;
   }
 
   .mini-bar {
-    width: 5px;
-    flex: 1;
-    border-radius: 2px 2px 0 0;
-    transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1);
+    width: 5px; flex: 1; border-radius: 2px 2px 0 0;
+    transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms;
     min-height: 1px;
   }
 
-  /* Model Breakdown */
-  .model-list {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    margin-bottom: 8px;
+  .no-data {
+    text-align: center;
+    font-size: 12px;
+    color: #9ca3af;
+    margin-bottom: 12px;
   }
+
+  .model-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
 
   .model-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    display: flex; align-items: center; gap: 8px; font-size: 12px;
   }
 
-  .model-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
+  .model-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .model-name { color: #374151; flex: 1; }
+  .model-value { color: #6b7280; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; }
 
-  .model-name {
-    color: #374151;
-    flex: 1;
-  }
+  .total-row { margin-top: 2px; padding-top: 5px; border-top: 1px solid #f3f4f6; }
+  .total-row .model-name, .total-row .model-value { font-weight: 600; color: #111827; }
 
-  .model-value {
-    color: #6b7280;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 11px;
-  }
+  .card-subtitle { font-size: 11px; color: #9ca3af; line-height: 1.4; }
 
-  .total-row {
-    margin-top: 2px;
-    padding-top: 5px;
-    border-top: 1px solid #f3f4f6;
-  }
-
-  .total-row .model-name,
-  .total-row .model-value {
-    font-weight: 600;
-    color: #111827;
-  }
-
-  .card-subtitle {
-    font-size: 11px;
-    color: #9ca3af;
-    line-height: 1.4;
-  }
-
-  .skeleton-lines {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
+  .skeleton-lines { display: flex; flex-direction: column; gap: 12px; }
   .skeleton-line {
     height: 14px;
     background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 4px;
+    background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px;
   }
 
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 </style>
