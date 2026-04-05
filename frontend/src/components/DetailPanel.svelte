@@ -45,33 +45,33 @@
 
   const { labels: dayLabels, count: barCount } = $derived(getLabelsAndCount(timeRange));
 
-  function genDaily(base: number, spike: number, spikeDay: number): number[] {
+  function genDaily(base: number, spike: number, spikeIdx: number): number[] {
     return Array.from({ length: barCount }, (_, i) => {
-      if (i < spikeDay - 5) return Math.round(base * (0.3 + Math.random() * 0.7));
-      if (i < spikeDay) return Math.round(base * (1 + (i - spikeDay + 5) * 0.4));
-      if (i === spikeDay) return spike;
-      if (i < spikeDay + 5) return Math.round(spike * (0.2 + Math.random() * 0.3));
+      if (i < spikeIdx - 2) return Math.round(base * (0.3 + Math.random() * 0.7));
+      if (i < spikeIdx) return Math.round(base * (1 + (i - spikeIdx + 2) * 0.3));
+      if (i === spikeIdx) return spike;
+      if (i < spikeIdx + 2) return Math.round(spike * (0.2 + Math.random() * 0.3));
       return Math.round(base * (0.4 + Math.random() * 0.6));
     });
   }
 
-  const models = {
+  const models = $derived({
     spend: [
-      { name: 'MiMo-V2-Pro', color: '#f5a623', data: genDaily(1, 67, 28) },
-      { name: 'DeepSeek V3', color: '#3ecf8e', data: genDaily(0.5, 5, 28) },
+      { name: 'MiMo-V2-Pro', color: '#f5a623', data: genDaily(1, 67, Math.floor(barCount * 0.8)) },
+      { name: 'DeepSeek V3', color: '#3ecf8e', data: genDaily(0.5, 5, Math.floor(barCount * 0.8)) },
       { name: 'MiMo-V2-Omni', color: '#7c9aff', data: dayLabels.map(() => 0) },
     ],
     requests: [
-      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(80, 2300, 28) },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(15, 85, 28) },
+      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(80, 2300, Math.floor(barCount * 0.8)) },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(15, 85, Math.floor(barCount * 0.8)) },
       { name: 'DeepSeek V3', color: '#f5a623', data: dayLabels.map(() => Math.round(Math.random() * 2)) },
     ],
     tokens: [
-      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(5000000, 120000000, 28) },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(800000, 5000000, 28) },
+      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(5000000, 120000000, Math.floor(barCount * 0.8)) },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(800000, 5000000, Math.floor(barCount * 0.8)) },
       { name: 'DeepSeek V3', color: '#f5a623', data: dayLabels.map(() => Math.round(Math.random() * 5000)) },
     ],
-  };
+  });
 
   const currentModels = $derived(models[viewType]);
 
