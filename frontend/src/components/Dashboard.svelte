@@ -64,9 +64,10 @@
     </div>
 
   {:else if section === 'projects-tasks'}
-    <div class="dashboard-grid">
+    <div class="full-page-stack">
       <TaskBoard {language} {loading} />
       <TaskCertainty {language} {loading} />
+      <ContextPressure {language} {loading} />
     </div>
 
   {:else if section === 'collaboration'}
@@ -81,9 +82,6 @@
   {:else if section === 'usage-cost'}
     <div class="usage-page">
       <ActivityPage {language} />
-      <div class="usage-section">
-        <ContextPressure {language} {loading} />
-      </div>
     </div>
 
   {:else if section === 'settings'}
@@ -195,10 +193,11 @@
     gap: 24px;
   }
 
-  .usage-section {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: var(--space-lg);
+  .full-page-stack {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
   }
 </style>
