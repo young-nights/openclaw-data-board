@@ -266,8 +266,8 @@
                           {/each}
                         </svg>
                         <div class="line-chart-labels">
-                          {#each weekLabels as label}
-                            <span>{label}</span>
+                          {#each weekLabels as label, i}
+                            <span style="left: {10 + (i / (weekLabels.length - 1)) * 80}%">{label}</span>
                           {/each}
                         </div>
                       </div>
@@ -472,7 +472,8 @@
   .detail-title { font-size: 15px; font-weight: 700; color: #374151; margin-bottom: 12px; }
   .line-chart-wrap { margin-bottom: 16px; }
   .line-chart-svg { width: 100%; height: 100px; }
-  .line-chart-labels { display: flex; justify-content: space-between; padding: 0 40px; font-size: 11px; color: #6b7280; font-weight: 500; }
+  .line-chart-labels { position: relative; height: 16px; font-size: 11px; color: #6b7280; font-weight: 500; }
+  .line-chart-labels span { position: absolute; transform: translateX(-50%); text-align: center; }
   .detail-stats { display: flex; gap: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; }
   .detail-stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-label { font-size: 13px; color: #9ca3af; font-weight: 500; }
