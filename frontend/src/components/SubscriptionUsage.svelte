@@ -74,8 +74,8 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     return data.map((v, i) => {
-      const x = 30 + (i / (data.length - 1)) * 340;
-      const y = 80 - (v / maxVal) * 60;
+      const x = 40 + (i / (data.length - 1)) * 720;
+      const y = 75 - (v / maxVal) * 55;
       return `${x},${y}`;
     }).join(' ');
   }
@@ -84,11 +84,11 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     const pts = data.map((v, i) => {
-      const x = 30 + (i / (data.length - 1)) * 340;
-      const y = 80 - (v / maxVal) * 60;
+      const x = 40 + (i / (data.length - 1)) * 720;
+      const y = 75 - (v / maxVal) * 55;
       return `${x},${y}`;
     });
-    return `${pts[0].split(',')[0]},90 ${pts.join(' ')} ${pts[pts.length-1].split(',')[0]},90`;
+    return `40,90 ${pts.join(' ')} 760,90`;
   }
 
   function getPointData(agent: string): Array<{x: number, y: number, v: number}> {
@@ -261,7 +261,7 @@
                           {/each}
                           <!-- X Labels -->
                           {#each weekLabels as label, i}
-                            {@const x = 30 + (i / (weekLabels.length - 1)) * 340}
+                            {@const lx = 40 + (i / (weekLabels.length - 1)) * 720}
                             <text x={x} y="115" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">{label}</text>
                           {/each}
                         </svg>
