@@ -244,7 +244,7 @@
                     <div class="detail-section">
                       <div class="detail-title">{t('Daily Requests (Last 7 Days)', '每日请求数（近 7 天）')}</div>
                       <div class="line-chart-wrap">
-                        <svg viewBox="0 0 400 130" class="line-chart-svg">
+                        <svg viewBox="0 0 600 130" class="line-chart-svg">
                           <!-- Grid -->
                           {#each [0, 25, 50, 75, 100] as pct}
                             <line x1="30" y1={90 - pct * 0.7} x2="370" y2={90 - pct * 0.7} stroke="#f3f4f6" stroke-width="1" />
