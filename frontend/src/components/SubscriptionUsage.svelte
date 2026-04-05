@@ -262,7 +262,7 @@
                           <!-- X Labels -->
                           {#each weekLabels as label, i}
                             {@const lx = 40 + (i / (weekLabels.length - 1)) * 720}
-                            <text x={x} y="115" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">{label}</text>
+                            <text x={lx} y="115" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">{label}</text>
                           {/each}
                         </svg>
                       </div>
