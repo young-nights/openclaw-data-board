@@ -12,7 +12,6 @@
     return language === 'zh' ? zh : en;
   }
 
-  // Time range state
   let timeRange = $state<'1h' | '1d' | '7d' | '1m' | '1y'>('7d');
   let groupBy = $state<'model' | 'key' | 'provider'>('model');
   let detailView = $state<'spend' | 'requests' | 'tokens' | null>(null);
@@ -32,15 +31,28 @@
     { key: 'provider' as const, label: t('By Provider', '按供应商') },
   ];
 
-  // Summary data
-  const summary = {
-    totalSpend: '$1.40',
-    spendSubtitle: t('Today $0.19 · This month $1.40', '今日 $0.19 · 本月 $1.40'),
-    totalRequests: '418',
-    requestsSubtitle: t('Including 12 chatroom sessions', '含 12 个聊天会话'),
-    totalTokens: '136.5K',
-    tokensSubtitle: t('Prompt 89.2K · Completion 42.1K · Reasoning 5.2K', '输入 89.2K · 输出 42.1K · 推理 5.2K'),
-  };
+  // Mock data matching OpenRouter style
+  const spendChartData = [0.01, 0.005, 0.02, 0.015, 0.08, 0.06, 0.07];
+  const requestsChartData = [120, 80, 200, 150, 350, 280, 310];
+  const tokensChartData = [15000, 8000, 25000, 18000, 65000, 48000, 55000];
+
+  const spendModels = [
+    { name: 'MiMo-V2-Pro', value: '0.0679', color: '#f5a623' },
+    { name: 'DeepSeek V3', value: '0.00552', color: '#3ecf8e' },
+    { name: 'MiMo-V2-Omni', value: '0', color: '#7c9aff' },
+  ];
+
+  const requestsModels = [
+    { name: 'MiMo-V2-Pro', value: '6.03K', color: '#00d4aa' },
+    { name: 'MiMo-V2-Omni', value: '507', color: '#7c9aff' },
+    { name: 'DeepSeek V3', value: '2', color: '#f5a623' },
+  ];
+
+  const tokensModels = [
+    { name: 'MiMo-V2-Pro', value: '608M', color: '#00d4aa' },
+    { name: 'MiMo-V2-Omni', value: '25.2M', color: '#7c9aff' },
+    { name: 'DeepSeek V3', value: '11K', color: '#f5a623' },
+  ];
 
   function handleRefresh() {
     lastUpdated = new Date();
@@ -59,13 +71,9 @@
   <!-- Top Bar -->
   <div class="page-header">
     <div class="header-left">
-      <h2 class="page-title">
-        <span class="title-icon">📊</span>
-        {t('Activity', '活动')}
-      </h2>
+      <h2 class="page-title">Activity</h2>
     </div>
     <div class="header-controls">
-      <!-- Time Range -->
       <div class="control-group">
         {#each timeRanges as tr}
           <button
@@ -78,49 +86,49 @@
         {/each}
       </div>
 
-      <!-- Group By -->
       <select class="select-control" bind:value={groupBy}>
         {#each groupOptions as opt}
           <option value={opt.key}>{opt.label}</option>
         {/each}
       </select>
-
-      <!-- Export -->
-      <button class="export-btn" title={t('Export CSV', '导出 CSV')}>
-        📥 CSV
-      </button>
     </div>
   </div>
 
-  <!-- Metric Cards -->
+  <!-- Three Metric Cards -->
   <div class="metrics-row">
     <MetricCard
-      title={t('Total Spend', '总花费')}
-      value={summary.totalSpend}
-      subtitle={summary.spendSubtitle}
+      title="Spend"
+      value="$0.0735"
+      subtitle=""
       color="spend"
       icon="💰"
+      chartData={spendChartData}
+      modelBreakdown={spendModels}
       onClick={() => openDetail('spend')}
     />
     <MetricCard
-      title={t('Total Requests', '总请求数')}
-      value={summary.totalRequests}
-      subtitle={summary.requestsSubtitle}
+      title="Requests"
+      value="7K"
+      subtitle=""
       color="requests"
       icon="📊"
+      chartData={requestsChartData}
+      modelBreakdown={requestsModels}
       onClick={() => openDetail('requests')}
     />
     <MetricCard
-      title={t('Total Tokens', '总 Token')}
-      value={summary.totalTokens}
-      subtitle={summary.tokensSubtitle}
+      title="Tokens"
+      value="633M"
+      subtitle=""
       color="tokens"
       icon="🔢"
+      chartData={tokensChartData}
+      modelBreakdown={tokensModels}
       onClick={() => openDetail('tokens')}
     />
   </div>
 
-  <!-- Detail Panel (expandable) -->
+  <!-- Detail Panel -->
   {#if detailView}
     <div class="detail-section">
       <DetailPanel
@@ -134,121 +142,97 @@
   <!-- Footer -->
   <div class="page-footer">
     <span class="footer-note">
-      {t('Logs have moved to the Logs page', '日志已移至日志页面')}
+      {t('Logs have moved', '日志已迁移')}
+      <a href="#logs" class="footer-link">{t('Your API request logs now have their own dedicated page.', 'API 请求日志已有专属页面。')}</a>
     </span>
     <div class="footer-actions">
-      <span class="last-updated">
-        {t('Updated', '更新于')} {formatTime(lastUpdated)}
-      </span>
-      <button class="refresh-btn" onclick={handleRefresh}>
-        🔄 {t('Refresh', '刷新')}
-      </button>
+      <span class="last-updated">{formatTime(lastUpdated)}</span>
+      <button class="refresh-btn" onclick={handleRefresh}>↻</button>
     </div>
   </div>
 </div>
 
 <style>
   .activity-page {
-    max-width: 1400px;
+    max-width: 1200px;
     margin: 0 auto;
   }
 
-  /* Header */
   .page-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-xl);
+    margin-bottom: 24px;
     flex-wrap: wrap;
-    gap: var(--space-md);
+    gap: 16px;
   }
 
   .page-title {
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 600;
     margin: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-  }
-
-  .title-icon {
-    font-size: 1.5rem;
+    color: #111827;
+    letter-spacing: -0.01em;
   }
 
   .header-controls {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 12px;
     flex-wrap: wrap;
   }
 
   .control-group {
     display: flex;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 2px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 3px;
   }
 
   .control-btn {
-    padding: 6px 12px;
+    padding: 6px 14px;
     border: none;
     background: transparent;
-    color: var(--text-muted);
-    font-size: var(--font-size-xs);
-    border-radius: var(--radius-sm);
+    color: #6b7280;
+    font-size: 13px;
+    border-radius: 7px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 120ms;
     white-space: nowrap;
   }
 
   .control-btn:hover {
-    color: var(--text-primary);
+    color: #111827;
   }
 
   .control-btn.active {
-    background: var(--accent-soft);
-    color: var(--accent);
+    background: #f3f4f6;
+    color: #111827;
+    font-weight: 500;
   }
 
   .select-control {
     padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-card);
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-    border-radius: var(--radius-md);
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #374151;
+    font-size: 13px;
+    border-radius: 10px;
     cursor: pointer;
     outline: none;
   }
 
   .select-control:focus {
-    border-color: var(--border-active);
-  }
-
-  .export-btn {
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-card);
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .export-btn:hover {
-    border-color: var(--border-active);
-    color: var(--text-primary);
+    border-color: #3b82f6;
   }
 
   /* Metrics Row */
   .metrics-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-lg);
-    margin-bottom: var(--space-xl);
+    gap: 20px;
+    margin-bottom: 24px;
   }
 
   @media (max-width: 900px) {
@@ -259,7 +243,7 @@
 
   /* Detail Section */
   .detail-section {
-    margin-bottom: var(--space-xl);
+    margin-bottom: 24px;
   }
 
   /* Footer */
@@ -267,42 +251,51 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: var(--space-lg);
-    border-top: 1px solid var(--border-color);
+    padding-top: 20px;
     flex-wrap: wrap;
-    gap: var(--space-md);
+    gap: 12px;
   }
 
   .footer-note {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
+    font-size: 13px;
+    color: #9ca3af;
+  }
+
+  .footer-link {
+    color: #6b7280;
+    text-decoration: underline;
+    margin-left: 4px;
   }
 
   .footer-actions {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
+    gap: 12px;
   }
 
   .last-updated {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    font-family: var(--font-mono);
+    font-size: 12px;
+    color: #9ca3af;
+    font-family: 'SF Mono', monospace;
   }
 
   .refresh-btn {
-    padding: 4px 12px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-input);
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-    border-radius: var(--radius-sm);
+    width: 32px;
+    height: 32px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #6b7280;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    font-size: 16px;
+    transition: all 120ms;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .refresh-btn:hover {
-    border-color: var(--border-active);
-    color: var(--text-primary);
+    border-color: #d1d5db;
+    color: #111827;
   }
 </style>

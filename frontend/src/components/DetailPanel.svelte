@@ -1,4 +1,4 @@
-<!-- DetailPanel.svelte - Drill-down Detail View with Chart + Table -->
+<!-- DetailPanel.svelte - OpenRouter-style Detail View -->
 <script lang="ts">
   import type { UiLanguage } from '../types';
 
@@ -12,64 +12,69 @@
     return language === 'zh' ? zh : en;
   }
 
-  // Token sub-type filter (for tokens view)
   let tokenFilter = $state<'total' | 'prompt' | 'completion' | 'reasoning' | 'cached'>('total');
-
-  // Sort state
   let sortKey = $state<string>('sum');
   let sortAsc = $state(false);
 
   const config = {
     spend: {
-      title: t('Spend Details', '花费详情'),
-      icon: '💰',
-      color: '#f5a623',
+      title: t('Spend By Model', '按模型花费'),
       unit: '$',
-      yLabel: t('Amount ($)', '金额 ($)'),
+      yLabels: ['0.02', '0.04', '0.06', '0.08'],
+      yMax: 0.08,
     },
     requests: {
-      title: t('Requests Details', '请求数详情'),
-      icon: '📊',
-      color: '#3ecf8e',
+      title: t('Requests By Model', '按模型请求数'),
       unit: '',
-      yLabel: t('Requests', '请求数'),
+      yLabels: ['1K', '2K', '3K', '4K'],
+      yMax: 4000,
     },
     tokens: {
-      title: t('Token Usage Details', 'Token 用量详情'),
-      icon: '🔢',
-      color: '#7c9aff',
+      title: t('Tokens By Model', '按模型 Token'),
       unit: '',
-      yLabel: t('Tokens', 'Token 数'),
+      yLabels: ['85M', '170M', '255M', '340M'],
+      yMax: 340000000,
     },
   };
 
   const cfg = $derived(config[viewType]);
 
-  // Mock data for bar chart (last 7 days)
-  const chartData = [
-    { label: '03/30', spend: 0.18, requests: 45, tokens: 12800 },
-    { label: '03/31', spend: 0.22, requests: 52, tokens: 15200 },
-    { label: '04/01', spend: 0.15, requests: 38, tokens: 11000 },
-    { label: '04/02', spend: 0.28, requests: 65, tokens: 18500 },
-    { label: '04/03', spend: 0.31, requests: 72, tokens: 21000 },
-    { label: '04/04', spend: 0.25, requests: 58, tokens: 16800 },
-    { label: '04/05', spend: 0.19, requests: 42, tokens: 12200 },
-  ];
+  // Time labels for X axis
+  const xLabels = ['Mar 6, 8:00 AM', 'Mar 13, 8:00 AM', 'Mar 20, 8:00 AM', 'Mar 27, 8:00 AM', 'Apr 3, 8:00 AM'];
 
-  function getChartValue(item: typeof chartData[number]): number {
-    if (viewType === 'spend') return item.spend;
-    if (viewType === 'requests') return item.requests;
-    return item.tokens;
-  }
+  // Mock stacked data per model per time period
+  const models = {
+    spend: [
+      { name: 'MiMo-V2-Pro', color: '#f5a623', data: [0, 0, 0.002, 0.008, 0.0679] },
+      { name: 'DeepSeek V3', color: '#3ecf8e', data: [0, 0, 0, 0.002, 0.00552] },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: [0, 0, 0, 0, 0] },
+    ],
+    requests: [
+      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: [200, 350, 800, 1200, 6030] },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: [50, 80, 120, 200, 507] },
+      { name: 'DeepSeek V3', color: '#f5a623', data: [0, 0, 1, 1, 2] },
+    ],
+    tokens: [
+      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: [10000000, 15000000, 40000000, 85000000, 608000000] },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: [2000000, 3000000, 5000000, 8000000, 25200000] },
+      { name: 'DeepSeek V3', color: '#f5a623', data: [0, 0, 1000, 5000, 11000] },
+    ],
+  };
 
-  const maxChartValue = $derived(Math.max(...chartData.map(getChartValue)));
+  const currentModels = $derived(models[viewType]);
 
-  // Mock model breakdown table data
+  // Calculate max stacked value for chart scaling
+  const maxStacked = $derived(
+    Math.max(...Array(5).fill(0).map((_, i) =>
+      currentModels.reduce((sum, m) => sum + m.data[i], 0)
+    ))
+  );
+
+  // Table data
   let tableData = $state([
-    { model: 'xiaomi/mimo-v2-pro', color: '#7c9aff', min: 0.01, max: 0.08, avg: 0.04, sum: 0.85, requests: 245, tokens: 52000 },
-    { model: 'xiaomi/mimo-v2-flash', color: '#a78bfa', min: 0.002, max: 0.01, avg: 0.005, sum: 0.12, requests: 89, tokens: 18500 },
-    { model: 'deepseek/deepseek-chat', color: '#3ecf8e', min: 0.005, max: 0.03, avg: 0.015, sum: 0.28, requests: 67, tokens: 14200 },
-    { model: 'qwen/qwen3-30b-a3b', color: '#f5a623', min: 0.003, max: 0.02, avg: 0.008, sum: 0.15, requests: 42, tokens: 9800 },
+    { model: 'MiMo-V2-Pro', color: '#f5a623', min: 0, max: 0.067, avg: 0.00679, sum: 0.0679 },
+    { model: 'DeepSeek V3', color: '#3ecf8e', min: 0.00552, max: 0.00552, avg: 0.00552, sum: 0.00552 },
+    { model: 'MiMo-V2-Omni', color: '#7c9aff', min: 0, max: 0, avg: 0, sum: 0 },
   ]);
 
   function handleSort(key: string) {
@@ -86,9 +91,16 @@
     });
   }
 
+  function formatVal(v: number): string {
+    if (viewType === 'spend') return `$${v}`;
+    if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+    if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
+    return String(v);
+  }
+
   function exportCSV() {
-    const headers = ['Model', 'Min', 'Max', 'Avg', 'Sum', 'Requests', 'Tokens'];
-    const rows = tableData.map(r => [r.model, r.min, r.max, r.avg, r.sum, r.requests, r.tokens]);
+    const headers = ['Model', 'Min', 'Max', 'Avg', 'Sum'];
+    const rows = tableData.map(r => [r.model, r.min, r.max, r.avg, r.sum]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -100,83 +112,92 @@
   }
 
   const tokenFilters = [
-    { key: 'total' as const, label: t('Total', '总计') },
-    { key: 'prompt' as const, label: t('Prompt', '输入') },
-    { key: 'completion' as const, label: t('Completion', '输出') },
-    { key: 'reasoning' as const, label: t('Reasoning', '推理') },
-    { key: 'cached' as const, label: t('Cached', '缓存') },
+    { key: 'total' as const, label: 'Total' },
+    { key: 'prompt' as const, label: 'Prompt' },
+    { key: 'completion' as const, label: 'Completion' },
+    { key: 'reasoning' as const, label: 'Reasoning' },
+    { key: 'cached' as const, label: 'Cached' },
   ];
 </script>
 
-<div class="detail-panel" style="--accent-color: {cfg.color}">
+<div class="detail-panel">
+  <!-- Header -->
   <div class="detail-header">
-    <div class="header-left">
-      <span class="header-icon">{cfg.icon}</span>
-      <h3>{cfg.title}</h3>
-    </div>
-    <div class="header-actions">
+    <h3>{cfg.title}</h3>
+    <div class="header-right">
       {#if viewType === 'tokens'}
-        <div class="filter-group">
+        <select class="filter-select" bind:value={tokenFilter}>
           {#each tokenFilters as f}
-            <button
-              class="filter-btn"
-              class:active={tokenFilter === f.key}
-              onclick={() => tokenFilter = f.key}
-            >
-              {f.label}
-            </button>
+            <option value={f.key}>{f.label}</option>
           {/each}
-        </div>
+        </select>
       {/if}
-      <button class="action-btn" onclick={exportCSV}>📥 CSV</button>
-      <button class="action-btn close-btn" onclick={onClose}>✕</button>
+      <button class="icon-btn" title="Settings">⚙️</button>
+      <button class="icon-btn close-btn" onclick={onClose}>✕</button>
     </div>
   </div>
 
-  <!-- Bar Chart -->
-  <div class="chart-section">
-    <div class="bar-chart">
-      {#each chartData as item}
-        {@const val = getChartValue(item)}
-        <div class="bar-col">
-          <div class="bar-value">
-            {viewType === 'spend' ? `$${val.toFixed(2)}` : val.toLocaleString()}
-          </div>
-          <div class="bar-track">
-            <div
-              class="bar-fill"
-              style="height: {maxChartValue > 0 ? (val / maxChartValue) * 100 : 0}%"
-            ></div>
-          </div>
-          <span class="bar-label">{item.label}</span>
-        </div>
+  <!-- Stacked Bar Chart -->
+  <div class="chart-container">
+    <!-- Y Axis Labels -->
+    <div class="y-axis">
+      {#each cfg.yLabels.slice().reverse() as label}
+        <span class="y-label">{label}</span>
       {/each}
     </div>
+
+    <!-- Chart Area -->
+    <div class="chart-area">
+      <div class="chart-grid">
+        {#each cfg.yLabels as _}
+          <div class="grid-line"></div>
+        {/each}
+      </div>
+
+      <div class="bars-container">
+        {#each Array(5) as _, i}
+          <div class="bar-group">
+            {#each currentModels as model}
+              {@const val = model.data[i]}
+              {@const pct = cfg.yMax > 0 ? (val / cfg.yMax) * 100 : 0}
+              <div
+                class="stacked-bar"
+                style="height: {pct}%; background: {model.color};"
+                title="{model.name}: {formatVal(val)}"
+              ></div>
+            {/each}
+          </div>
+        {/each}
+      </div>
+
+      <!-- X Axis Labels -->
+      <div class="x-axis">
+        {#each xLabels as label}
+          <span class="x-label">{label}</span>
+        {/each}
+      </div>
+    </div>
   </div>
 
-  <!-- Model Breakdown Table -->
-  <div class="table-section">
+  <!-- Table -->
+  <div class="table-container">
     <table class="detail-table">
       <thead>
         <tr>
           <th class="sortable" onclick={() => handleSort('model')}>
-            {t('Model', '模型')}
-            {#if sortKey === 'model'}<span class="sort-icon">{sortAsc ? '↑' : '↓'}</span>{/if}
+            Model <span class="sort-icon">{sortKey === 'model' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
-          <th class="sortable num" onclick={() => handleSort('min')}>
-            Min {#if sortKey === 'min'}<span class="sort-icon">{sortAsc ? '↑' : '↓'}</span>{/if}
+          <th class="num sortable" onclick={() => handleSort('min')}>
+            Min {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'min' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
-          <th class="sortable num" onclick={() => handleSort('max')}>
-            Max {#if sortKey === 'max'}<span class="sort-icon">{sortAsc ? '↑' : '↓'}</span>{/if}
+          <th class="num sortable" onclick={() => handleSort('max')}>
+            Max {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'max' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
-          <th class="sortable num" onclick={() => handleSort('avg')}>
-            Avg {#if sortKey === 'avg'}<span class="sort-icon">{sortAsc ? '↑' : '↓'}</span>{/if}
+          <th class="num sortable" onclick={() => handleSort('avg')}>
+            Avg {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'avg' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
-          <th class="sortable num highlight" onclick={() => handleSort('sum')}>
-            Sum {#if sortKey === 'sum'}<span class="sort-icon">{sortAsc ? '↑' : '↓'}</span>{/if}
-          </th>
-          <th class="sortable num" onclick={() => handleSort('requests')}>
-            {t('Requests', '请求数')} {#if sortKey === 'requests'}<span class="sort-icon">{sortAsc ? '↑' : '↓'}</span>{/if}
+          <th class="num sortable highlight" onclick={() => handleSort('sum')}>
+            Sum {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'sum' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
         </tr>
       </thead>
@@ -187,19 +208,10 @@
               <span class="model-dot" style="background: {row.color}"></span>
               {row.model}
             </td>
-            <td class="num">
-              {viewType === 'spend' ? `$${row.min.toFixed(3)}` : row.min}
-            </td>
-            <td class="num">
-              {viewType === 'spend' ? `$${row.max.toFixed(3)}` : row.max}
-            </td>
-            <td class="num">
-              {viewType === 'spend' ? `$${row.avg.toFixed(3)}` : row.avg}
-            </td>
-            <td class="num highlight">
-              {viewType === 'spend' ? `$${row.sum.toFixed(2)}` : row.sum.toLocaleString()}
-            </td>
-            <td class="num">{row.requests}</td>
+            <td class="num">{formatVal(row.min)}</td>
+            <td class="num">{formatVal(row.max)}</td>
+            <td class="num">{formatVal(row.avg)}</td>
+            <td class="num highlight">{formatVal(row.sum)}</td>
           </tr>
         {/each}
       </tbody>
@@ -209,150 +221,153 @@
 
 <style>
   .detail-panel {
-    background: var(--bg-card);
-    border: 1px solid var(--accent-color);
-    border-radius: var(--radius-xl);
-    padding: var(--space-xl);
-    animation: slideUp 300ms ease-out;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    animation: slideUp 250ms ease-out;
   }
 
   .detail-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-xl);
-    flex-wrap: wrap;
-    gap: var(--space-md);
+    margin-bottom: 24px;
   }
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-  }
-
-  .header-icon {
-    font-size: 1.25rem;
-  }
-
-  .header-left h3 {
-    font-size: var(--font-size-lg);
+  .detail-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
     margin: 0;
   }
 
-  .header-actions {
+  .header-right {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 8px;
   }
 
-  .filter-group {
-    display: flex;
-    background: var(--bg-input);
-    border-radius: var(--radius-md);
-    padding: 2px;
-  }
-
-  .filter-btn {
-    padding: 4px 10px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: var(--font-size-xs);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .filter-btn:hover {
-    color: var(--text-primary);
-  }
-
-  .filter-btn.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-
-  .action-btn {
+  .filter-select {
     padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-input);
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-    border-radius: var(--radius-sm);
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #374151;
+    background: #ffffff;
+    outline: none;
+  }
+
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 120ms;
   }
 
-  .action-btn:hover {
-    border-color: var(--border-active);
-    color: var(--text-primary);
-  }
-
-  .close-btn {
-    font-size: var(--font-size-sm);
+  .icon-btn:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
   }
 
   /* Chart */
-  .chart-section {
-    margin-bottom: var(--space-xl);
-  }
-
-  .bar-chart {
+  .chart-container {
     display: flex;
-    align-items: flex-end;
-    gap: var(--space-md);
-    height: 180px;
+    gap: 12px;
+    margin-bottom: 24px;
+    height: 240px;
   }
 
-  .bar-col {
-    flex: 1;
+  .y-axis {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    min-width: 48px;
+  }
+
+  .y-label {
+    font-size: 12px;
+    color: #9ca3af;
+    text-align: right;
+    font-family: 'SF Mono', monospace;
+  }
+
+  .chart-area {
+    flex: 1;
+    position: relative;
+  }
+
+  .chart-grid {
+    position: absolute;
+    inset: 8px 0 28px 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .grid-line {
+    border-bottom: 1px solid #f3f4f6;
+    width: 100%;
+  }
+
+  .bars-container {
+    position: absolute;
+    inset: 8px 0 28px 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    gap: 16px;
+    padding: 0 24px;
+  }
+
+  .bar-group {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    max-width: 48px;
     height: 100%;
   }
 
-  .bar-value {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    margin-bottom: var(--space-xs);
+  .stacked-bar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1);
+    min-height: 1px;
+    cursor: pointer;
+  }
+
+  .stacked-bar:hover {
+    opacity: 0.85;
+  }
+
+  .x-axis {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 24px 0;
+  }
+
+  .x-label {
+    font-size: 11px;
+    color: #9ca3af;
     white-space: nowrap;
   }
 
-  .bar-track {
-    flex: 1;
-    width: 100%;
-    max-width: 48px;
-    background: var(--bg-input);
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    overflow: hidden;
-    display: flex;
-    align-items: flex-end;
-  }
-
-  .bar-fill {
-    width: 100%;
-    background: var(--accent-color);
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    transition: height var(--transition-smooth);
-    opacity: 0.8;
-  }
-
-  .bar-col:hover .bar-fill {
-    opacity: 1;
-  }
-
-  .bar-label {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    margin-top: var(--space-sm);
-    font-family: var(--font-mono);
-  }
-
   /* Table */
-  .table-section {
+  .table-container {
     overflow-x: auto;
   }
 
@@ -362,13 +377,12 @@
   }
 
   .detail-table th {
-    font-size: var(--font-size-xs);
+    font-size: 12px;
     font-weight: 500;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: var(--space-sm) var(--space-md);
-    border-bottom: 1px solid var(--border-color);
+    color: #6b7280;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
     white-space: nowrap;
   }
 
@@ -377,57 +391,62 @@
   }
 
   .detail-table th.highlight {
-    color: var(--accent-color);
+    color: #111827;
+    font-weight: 600;
   }
 
   .sortable {
     cursor: pointer;
     user-select: none;
-    transition: color var(--transition-fast);
+    transition: color 120ms;
   }
 
   .sortable:hover {
-    color: var(--text-primary);
+    color: #111827;
   }
 
   .sort-icon {
-    font-size: var(--font-size-xs);
-    margin-left: 2px;
+    font-size: 10px;
+    margin-left: 4px;
+    color: #d1d5db;
   }
 
   .detail-table td {
-    padding: var(--space-sm) var(--space-md);
-    border-bottom: 1px solid var(--border-color);
-    font-size: var(--font-size-sm);
+    padding: 12px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 14px;
+    color: #374151;
   }
 
   .detail-table td.num {
     text-align: right;
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    color: #6b7280;
   }
 
   .detail-table td.highlight {
-    color: var(--text-primary);
+    color: #111827;
     font-weight: 600;
   }
 
   .model-cell {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    font-family: var(--font-mono);
-    font-size: var(--font-size-xs);
+    gap: 10px;
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    color: #111827;
   }
 
   .model-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: var(--radius-full);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
     flex-shrink: 0;
   }
 
   .detail-table tbody tr:hover {
-    background: var(--bg-input);
+    background: #f9fafb;
   }
 </style>
