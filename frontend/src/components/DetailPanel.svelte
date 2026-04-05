@@ -137,19 +137,21 @@
   let tooltipY = $state(0);
 
   let hoveredModel = $state<string | null>(null);
+  let hoveredBarIdx = $state<number | null>(null);
 
-  function showTooltip(e: MouseEvent, idx: number) {
+  function showTooltip(idx: number, barEl: HTMLElement) {
     tooltipDay = idx;
-    const barCell = e.currentTarget as HTMLElement;
-    const barStack = barCell.querySelector('.bar-stack');
-    if (barStack) {
-      const r = barStack.getBoundingClientRect();
-      tooltipX = Math.round(r.left + r.width / 2);
-      tooltipY = Math.round(r.top);
-    }
+    hoveredBarIdx = idx;
+    const r = barEl.getBoundingClientRect();
+    tooltipX = Math.round(r.left + r.width / 2);
+    tooltipY = Math.round(r.top);
   }
 
-  function moveTooltip(e: MouseEvent) {}
+  function hideTooltip() {
+    tooltipDay = null;
+    hoveredBarIdx = null;
+    hoveredModel = null;
+  }
 
   function highlightModel(modelName: string | null) {
     hoveredModel = modelName;
@@ -239,7 +241,7 @@
             <div
               class="bar-cell"
               class:active={tooltipDay === i}
-              onmouseenter={(e) => showTooltip(e, i)}
+              onmouseenter={() => { tooltipDay = i; hoveredBarIdx = i; }}
               onmouseleave={hideTooltip}
             >
               <div class="bar-stack" style="height: {Math.min(pct, 100)}%">
@@ -249,7 +251,7 @@
                     style="height: {Math.min(mpct, 100)}%; background: {model.color}"
                     class:dimmed={hoveredModel !== null && hoveredModel !== model.name}
                     class:highlighted={hoveredModel === model.name}
-                    onmouseenter={() => highlightModel(model.name)}
+                    onmouseenter={(e) => { highlightModel(model.name); const cell = (e.target as HTMLElement).closest('.bar-cell'); if (cell) showTooltip(i, cell); }}
                     onmouseleave={() => highlightModel(null)}
                   ></div>
                 {/each}
@@ -510,29 +512,15 @@
     position: fixed;
     left: 0;
     top: 0;
-    transform: translate(calc(var(--tooltip-x) - 50%), calc(var(--tooltip-y) - 100% - 10px));
+    transform: translate(calc(var(--tooltip-x) - 50%), calc(var(--tooltip-y) - 100% - 8px));
     z-index: 100;
     pointer-events: none;
-    min-width: 150px;
+    min-width: 140px;
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     overflow: hidden;
-  }
-
-  /* Arrow pointing down to bar */
-  .tooltip::after {
-    content: '';
-    position: absolute;
-    bottom: -5px;
-    left: 50%;
-    width: 10px;
-    height: 10px;
-    background: #ffffff;
-    border-right: 1px solid #e5e7eb;
-    border-bottom: 1px solid #e5e7eb;
-    transform: translateX(-50%) rotate(45deg);
   }
 
   .tooltip-date {
