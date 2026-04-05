@@ -74,8 +74,8 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     return data.map((v, i) => {
-      const x = 40 + (i / (data.length - 1)) * 280;
-      const y = 80 - (v / maxVal) * 60;
+      const x = 40 + (i / (data.length - 1)) * 320;
+      const y = 90 - (v / maxVal) * 70;
       return `${x},${y}`;
     }).join(' ');
   }
@@ -84,19 +84,19 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     const pts = data.map((v, i) => {
-      const x = 40 + (i / (data.length - 1)) * 280;
-      const y = 80 - (v / maxVal) * 60;
+      const x = 40 + (i / (data.length - 1)) * 320;
+      const y = 90 - (v / maxVal) * 70;
       return `${x},${y}`;
     });
-    return `${pts[0].split(',')[0]},80 ${pts.join(' ')} ${pts[pts.length-1].split(',')[0]},80`;
+    return `${pts[0].split(',')[0]},90 ${pts.join(' ')} ${pts[pts.length-1].split(',')[0]},90`;
   }
 
   function getPointData(agent: string): Array<{x: number, y: number, v: number}> {
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     return data.map((v, i) => ({
-      x: 40 + (i / (data.length - 1)) * 280,
-      y: 80 - (v / maxVal) * 60,
+      x: 40 + (i / (data.length - 1)) * 320,
+      y: 90 - (v / maxVal) * 70,
       v
     }));
   }
@@ -244,9 +244,9 @@
                     <div class="detail-section">
                       <div class="detail-title">{t('Daily Requests (Last 7 Days)', '每日请求数（近 7 天）')}</div>
                       <div class="line-chart-wrap">
-                        <svg viewBox="0 0 360 100" class="line-chart-svg">
+                        <svg viewBox="0 0 400 120" class="line-chart-svg">
                           {#each [0, 25, 50, 75, 100] as pct}
-                            <line x1="30" y1={80 - pct * 0.6} x2="340" y2={80 - pct * 0.6} stroke="#f3f4f6" stroke-width="1" />
+                            <line x1="30" y1={90 - pct * 0.7} x2="370" y2={90 - pct * 0.7} stroke="#f3f4f6" stroke-width="1" />
                           {/each}
                           <polyline
                             fill="none"
@@ -261,8 +261,8 @@
                             points={getAreaPoints(row.agent)}
                           />
                           {#each getPointData(row.agent) as p}
-                            <circle cx={p.x} cy={p.y} r="3" fill="#3b82f6" stroke="#ffffff" stroke-width="2" />
-                            <text x={p.x} y={p.y - 8} text-anchor="middle" font-size="9" fill="#374151" font-weight="600">{p.v}</text>
+                            <circle cx={p.x} cy={p.y} r="4" fill="#3b82f6" stroke="#ffffff" stroke-width="2" />
+                            <text x={p.x} y={p.y - 10} text-anchor="middle" font-size="10" fill="#111827" font-weight="700">{p.v}</text>
                           {/each}
                         </svg>
                         <div class="line-chart-labels">
@@ -472,7 +472,7 @@
   .detail-title { font-size: 15px; font-weight: 700; color: #374151; margin-bottom: 12px; }
   .line-chart-wrap { margin-bottom: 16px; }
   .line-chart-svg { width: 100%; height: 100px; }
-  .line-chart-labels { display: flex; justify-content: space-between; padding: 0 40px; font-size: 10px; color: #9ca3af; }
+  .line-chart-labels { display: flex; justify-content: space-between; padding: 0 40px; font-size: 11px; color: #6b7280; font-weight: 500; }
   .detail-stats { display: flex; gap: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; }
   .detail-stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-label { font-size: 13px; color: #9ca3af; font-weight: 500; }
