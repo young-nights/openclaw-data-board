@@ -10,15 +10,13 @@
 
   let activeTab = $state<'agent' | 'model' | 'key'>('agent');
 
-  // Mock subscription data
-  const subscription = $state({
-    plan: 'Free',
-    credit: '$0.00',
-    creditLimit: '$0.00',
-    totalCost: '$0.0735',
-    remainingCredit: '$0.00',
-    expiresAt: 'N/A',
-  });
+  // Per-provider subscription data
+  const providerPlans = $state([
+    { provider: 'Xiaomi MiMo', logo: '⚡', plan: 'Free', credit: '$0.00', creditLimit: '$0.00', cost: '$0.0679', requests: 6537, billingUrl: 'https://platform.mimo-ai.com/billing', color: '#f5a623' },
+    { provider: 'DeepSeek', logo: '🧠', plan: 'Free', credit: '$0.00', creditLimit: '$0.00', cost: '$0.00556', requests: 2, billingUrl: 'https://platform.deepseek.com/billing', color: '#3ecf8e' },
+  ]);
+
+  const totalCost = $derived(providerPlans.reduce((sum, p) => sum + parseFloat(p.cost.replace('$', '')), 0).toFixed(4));
 
   // Agent data - each agent has assigned model and usage
   const agentData = [
@@ -74,25 +72,55 @@
   <!-- Subscription Overview Cards -->
   <div class="sub-cards-row">
     <div class="sub-card">
-      <div class="sub-card-label">{t('Current Plan', '当前套餐')}</div>
-      <div class="sub-card-value">{subscription.plan}</div>
-      <div class="sub-card-detail">{t('Expires', '到期')}: {subscription.expiresAt}</div>
+      <div class="sub-card-label">{t('Total Cost', '总花费')}</div>
+      <div class="sub-card-value cost">${totalCost}</div>
+      <div class="sub-card-detail">{t('All providers combined', '所有供应商合计')}</div>
     </div>
     <div class="sub-card">
-      <div class="sub-card-label">{t('Total Cost', '总花费')}</div>
-      <div class="sub-card-value cost">{subscription.totalCost}</div>
-      <div class="sub-card-detail">{t('All agents combined', '所有 Agent 合计')}</div>
+      <div class="sub-card-label">{t('Active Providers', '活跃供应商')}</div>
+      <div class="sub-card-value">{providerPlans.length}</div>
+      <div class="sub-card-detail">{t('Across 4 models', '使用 4 个模型')}</div>
     </div>
     <div class="sub-card">
       <div class="sub-card-label">{t('Active Agents', '活跃 Agent')}</div>
       <div class="sub-card-value">5</div>
-      <div class="sub-card-detail">{t('Across 4 models', '使用 4 个模型')}</div>
+      <div class="sub-card-detail">{t('All running', '全部运行中')}</div>
     </div>
     <div class="sub-card">
       <div class="sub-card-label">{t('Total Requests', '总请求数')}</div>
       <div class="sub-card-value">6,539</div>
       <div class="sub-card-detail">{t('Last 7 days', '近 7 天')}</div>
     </div>
+  </div>
+
+  <!-- Per-Provider Plan Cards -->
+  <div class="provider-cards-row">
+    {#each providerPlans as pp}
+      <div class="provider-card" style="border-left: 4px solid {pp.color}">
+        <div class="provider-header">
+          <span class="provider-logo">{pp.logo}</span>
+          <div class="provider-info">
+            <div class="provider-name">{pp.provider}</div>
+            <div class="provider-plan" style="color: {pp.color}">{pp.plan}</div>
+          </div>
+          <a href={pp.billingUrl} target="_blank" class="billing-link">{t('Billing', '账单')} ↗</a>
+        </div>
+        <div class="provider-stats">
+          <div class="provider-stat">
+            <span class="provider-stat-label">{t('Cost', '花费')}</span>
+            <span class="provider-stat-value">{pp.cost}</span>
+          </div>
+          <div class="provider-stat">
+            <span class="provider-stat-label">{t('Requests', '请求数')}</span>
+            <span class="provider-stat-value">{pp.requests.toLocaleString()}</span>
+          </div>
+          <div class="provider-stat">
+            <span class="provider-stat-label">{t('Credit', '额度')}</span>
+            <span class="provider-stat-value">{pp.credit} / {pp.creditLimit}</span>
+          </div>
+        </div>
+      </div>
+    {/each}
   </div>
 
   <!-- Tabs -->
@@ -290,6 +318,25 @@
   .sub-card-value { font-size: 28px; font-weight: 700; color: #111827; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
   .sub-card-value.cost { color: #f5a623; }
   .sub-card-detail { font-size: 12px; color: #9ca3af; }
+
+  /* Provider Cards */
+  .provider-cards-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 28px; }
+
+  .provider-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; transition: all 200ms; }
+  .provider-card:hover { border-color: #d1d5db; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+
+  .provider-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .provider-logo { font-size: 28px; }
+  .provider-info { flex: 1; }
+  .provider-name { font-size: 15px; font-weight: 600; color: #111827; }
+  .provider-plan { font-size: 13px; font-weight: 500; margin-top: 2px; }
+  .billing-link { font-size: 12px; color: #3b82f6; text-decoration: none; padding: 4px 10px; border: 1px solid #3b82f6; border-radius: 6px; transition: all 120ms; white-space: nowrap; }
+  .billing-link:hover { background: #3b82f6; color: #ffffff; }
+
+  .provider-stats { display: flex; gap: 24px; }
+  .provider-stat { display: flex; flex-direction: column; gap: 2px; }
+  .provider-stat-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
+  .provider-stat-value { font-size: 16px; font-weight: 600; color: #111827; font-family: 'SF Mono', monospace; }
 
   /* Tabs */
   .tab-bar { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
