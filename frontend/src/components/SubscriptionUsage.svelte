@@ -95,8 +95,8 @@
     const data = agentTrends[agent];
     const maxVal = Math.max(...data);
     return data.map((v, i) => ({
-      x: 30 + (i / (data.length - 1)) * 340,
-      y: 80 - (v / maxVal) * 60,
+      x: 40 + (i / (data.length - 1)) * 720,
+      y: 75 - (v / maxVal) * 55,
       v
     }));
   }
@@ -244,7 +244,7 @@
                     <div class="detail-section">
                       <div class="detail-title">{t('Daily Requests (Last 7 Days)', '每日请求数（近 7 天）')}</div>
                       <div class="line-chart-wrap">
-                        <svg viewBox="0 0 800 130" class="line-chart-svg" preserveAspectRatio="none">
+                        <svg viewBox="0 0 800 130" class="line-chart-svg" >
                           <!-- Grid -->
                           {#each [0, 25, 50, 75, 100] as pct}
                             <line x1="30" y1={90 - pct * 0.7} x2="370" y2={90 - pct * 0.7} stroke="#f3f4f6" stroke-width="1" />
@@ -261,8 +261,8 @@
                           {/each}
                           <!-- X Labels -->
                           {#each weekLabels as label, i}
-                            {@const lx = 40 + (i / (weekLabels.length - 1)) * 720}
-                            <text x={lx} y="115" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">{label}</text>
+                            
+                            <text x={40 + (i / (weekLabels.length - 1)) * 720} y="118" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">{label}</text>
                           {/each}
                         </svg>
                       </div>
