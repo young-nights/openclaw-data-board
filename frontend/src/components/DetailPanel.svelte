@@ -13,6 +13,22 @@
   let sortAsc = $state(false);
   let hoveredBarIdx = $state<number | null>(null);
   let hoveredModel = $state<string | null>(null);
+  let tooltipDay = $state<number | null>(null);
+  let tooltipX = $state(0);
+  let tooltipY = $state(0);
+
+  function showTooltip(idx: number, el: HTMLElement) {
+    tooltipDay = idx;
+    const r = el.getBoundingClientRect();
+    tooltipX = r.left + r.width / 2;
+    tooltipY = r.top;
+  }
+
+  function hideAll() {
+    hoveredBarIdx = null;
+    hoveredModel = null;
+    tooltipDay = null;
+  }
 
   const config = {
     spend: { title: 'Spend By Model', unit: '$' },
@@ -154,11 +170,12 @@
             {@const total = currentModels.reduce((s, m) => s + m.data[i], 0)}
             {@const pct = yMax > 0 ? (total / yMax) * 100 : 0}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="bar-cell"
               class:active={hoveredBarIdx === i}
-              onmouseenter={() => { hoveredBarIdx = i; }}
-              onmouseleave={() => { hoveredBarIdx = null; hoveredModel = null; }}
+              onmouseenter={(e) => { hoveredBarIdx = i; showTooltip(i, e.currentTarget); }}
+              onmouseleave={() => hideAll()}
             >
               <div class="bar-stack" style="height: {Math.min(pct, 100)}%">
                 {#each currentModels.slice().reverse() as model}
@@ -176,6 +193,28 @@
             </div>
           {/each}
         </div>
+
+        <!-- Tooltip -->
+        {#if tooltipDay !== null}
+          <div class="tooltip" style="--tx: {tooltipX}px; --ty: {tooltipY}px">
+            <div class="tooltip-date">{dayLabels[tooltipDay]}</div>
+            <div class="tooltip-body">
+              {#each currentModels as model}
+                {#if model.data[tooltipDay] > 0}
+                  <div class="tooltip-row" class:hl={hoveredModel === model.name}>
+                    <span class="tooltip-dot" style="background: {model.color}"></span>
+                    <span class="tooltip-name">{model.name}</span>
+                    <span class="tooltip-val">{formatVal(model.data[tooltipDay])}</span>
+                  </div>
+                {/if}
+              {/each}
+              <div class="tooltip-total">
+                <span>Total</span>
+                <span class="tooltip-val">{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</span>
+              </div>
+            </div>
+          </div>
+        {/if}
 
         <!-- X Axis -->
         <div class="x-axis">
@@ -402,6 +441,79 @@
 
   .x-label.visible {
     visibility: visible;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform: translate(calc(var(--tx) - 50%), calc(var(--ty) - 100% - 8px));
+    z-index: 100;
+    pointer-events: none;
+    min-width: 140px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+  }
+
+  .tooltip-date {
+    background: #f9fafb;
+    color: #111827;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .tooltip-body {
+    padding: 8px 12px;
+  }
+
+  .tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 3px 0;
+    transition: background 150ms;
+  }
+
+  .tooltip-row.hl {
+    background: #f3f4f6;
+    border-radius: 4px;
+  }
+
+  .tooltip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .tooltip-name {
+    flex: 1;
+    color: #6b7280;
+  }
+
+  .tooltip-val {
+    font-family: 'SF Mono', monospace;
+    font-size: 12px;
+    color: #111827;
+    font-weight: 600;
+  }
+
+  .tooltip-total {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 12px;
+    color: #374151;
+    font-weight: 500;
   }
 
   /* Table */
