@@ -85,11 +85,28 @@
   // Nice Y-axis max
   function niceMax(v: number): number {
     if (viewType === 'spend') {
-      const steps = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
-      return (steps.find(s => s >= v * 1.2) ?? v * 1.2) / 100;
+      const steps = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
+      const target = v * 1.15;
+      return steps.find(s => s >= target) ?? Math.ceil(target * 10) / 10;
     }
-    const mag = Math.pow(10, Math.floor(Math.log10(v || 1)));
-    const norm = v / mag;
+    // For requests and tokens
+    const target = v * 1.15;
+    if (target <= 10) return 10;
+    if (target <= 50) return 50;
+    if (target <= 100) return 100;
+    if (target <= 250) return 250;
+    if (target <= 500) return 500;
+    if (target <= 1000) return 1000;
+    if (target <= 2000) return 2000;
+    if (target <= 3000) return 3000;
+    if (target <= 5000) return 5000;
+    if (target <= 10000) return 10000;
+    if (target <= 50000) return 50000;
+    if (target <= 100000) return 100000;
+    if (target <= 500000) return 500000;
+    if (target <= 1000000) return 1000000;
+    const mag = Math.pow(10, Math.floor(Math.log10(target)));
+    const norm = target / mag;
     const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
     return nice * mag;
   }
@@ -100,13 +117,13 @@
     if (viewType === 'spend') {
       return [0, 1, 2, 3, 4].map(i => {
         const v = max * i / 4;
-        return v === 0 ? '0' : `$${v.toFixed(2)}`;
+        return v === 0 ? '$0' : `$${v.toFixed(2)}`;
       }).reverse();
     }
     return [0, 1, 2, 3, 4].map(i => {
       const v = max * i / 4;
-      if (v >= 1000000) return `${(v / 1000000).toFixed(0)}M`;
-      if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
+      if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+      if (v >= 1000) return `${Math.round(v / 1000)}K`;
       return String(Math.round(v));
     }).reverse();
   }
@@ -123,8 +140,8 @@
     tooltipDay = idx;
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
-    tooltipX = rect.left + rect.width / 2;
-    tooltipY = rect.top;
+    tooltipX = rect.right + 8;
+    tooltipY = rect.top + rect.height / 2;
   }
 
   function moveTooltip(e: MouseEvent) {
@@ -459,27 +476,27 @@
     border-radius: 4px 4px 0 0;
   }
 
-  /* Tooltip - attached to bar */
+  /* Tooltip - to the right of bar */
   .tooltip {
     position: fixed;
     left: var(--tooltip-x);
     top: var(--tooltip-y);
-    transform: translate(-50%, -100%);
-    margin-top: -12px;
+    transform: translateY(-50%);
     z-index: 100;
     pointer-events: none;
-    min-width: 160px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    min-width: 170px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
     border-radius: 10px;
     overflow: hidden;
+    border: 1px solid #e5e7eb;
   }
 
   .tooltip-date {
-    background: #111827;
+    background: #1f2937;
     color: #ffffff;
     font-size: 12px;
-    font-weight: 600;
-    padding: 6px 12px;
+    font-weight: 500;
+    padding: 8px 12px;
     text-align: center;
   }
 
