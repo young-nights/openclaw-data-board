@@ -20,7 +20,7 @@
   function showTooltip(idx: number, el: HTMLElement) {
     tooltipDay = idx;
     const r = el.getBoundingClientRect();
-    tooltipX = r.left + r.width / 2;
+    tooltipX = r.right;
     tooltipY = r.top + r.height / 2;
   }
 
@@ -425,13 +425,13 @@
   }
 
   .bar-segment.dimmed {
-    filter: brightness(0.85);
-    opacity: 0.5;
+    filter: brightness(0.6);
+    opacity: 0.3;
   }
 
   .bar-segment.highlighted {
-    filter: brightness(1.2);
-    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+    filter: brightness(1.3);
+    box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.4);
   }
 
   /* X Axis */
@@ -462,10 +462,10 @@
     position: fixed;
     left: 0;
     top: 0;
-    transform: translate(calc(var(--tx) - 50%), calc(var(--ty) - 100% - 8px));
+    transform: translate(8px, calc(var(--ty) - 50%));
     z-index: 100;
     pointer-events: none;
-    min-width: 140px;
+    min-width: 180px;
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -483,20 +483,21 @@
   }
 
   .tooltip-body {
-    padding: 8px 12px;
+    padding: 6px 10px;
   }
 
   .tooltip-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    padding: 3px 0;
+    gap: 6px;
+    font-size: 11px;
+    padding: 2px 4px;
+    line-height: 1.3;
     transition: background 150ms;
   }
 
   .tooltip-row.hl {
-    background: #f3f4f6;
+    background: #eff6ff;
     border-radius: 4px;
   }
 
@@ -514,7 +515,7 @@
 
   .tooltip-val {
     font-family: 'SF Mono', monospace;
-    font-size: 12px;
+    font-size: 11px;
     color: #111827;
     font-weight: 600;
   }
