@@ -228,20 +228,20 @@
         <!-- Tooltip -->
         {#if tooltipDay !== null}
           <div class="tooltip" style="left: {tooltipX}px">
-            <div class="tooltip-date">{dayLabels[tooltipDay]}, 2026 at 8:00 AM</div>
-            <div class="tooltip-models">
+            <div class="tooltip-date">{dayLabels[tooltipDay]}</div>
+            <div class="tooltip-body">
               {#each currentModels as model}
                 {#if model.data[tooltipDay] > 0}
                   <div class="tooltip-row">
-                    <span class="tooltip-dot" style="background: {model.color}"></span>
-                    <span>{model.name}</span>
-                    <strong>{formatVal(model.data[tooltipDay])}</strong>
+                    <span class="tooltip-line" style="background: {model.color}"></span>
+                    <span class="tooltip-model-name">{model.name}</span>
+                    <strong class="tooltip-value">{formatVal(model.data[tooltipDay])}</strong>
                   </div>
                 {/if}
               {/each}
-            </div>
-            <div class="tooltip-total">
-              Total: <strong>{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</strong>
+              <div class="tooltip-total">
+                Total <strong>{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</strong>
+              </div>
             </div>
           </div>
         {/if}
@@ -445,60 +445,71 @@
     transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  /* Tooltip - transparent, compact */
+  /* Tooltip - reference style */
   .tooltip {
     position: absolute;
-    top: -8px;
+    top: -12px;
     transform: translateX(-50%);
-    background: rgba(17, 24, 39, 0.88);
-    backdrop-filter: blur(8px);
-    color: #f9fafb;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 11px;
     z-index: 10;
-    min-width: 160px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     pointer-events: none;
+    min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
   }
 
   .tooltip-date {
-    font-size: 10px;
-    color: #d1d5db;
-    margin-bottom: 6px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(17, 24, 39, 0.9);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
   }
 
-  .tooltip-models {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+  .tooltip-body {
+    background: #ffffff;
+    padding: 10px 12px;
   }
 
   .tooltip-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 8px;
+    font-size: 13px;
+    padding: 3px 0;
   }
 
-  .tooltip-row span:first-child { flex: 1; }
-  .tooltip-row strong { font-family: 'SF Mono', monospace; font-size: 11px; }
-
-  .tooltip-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
+  .tooltip-line {
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
     flex-shrink: 0;
   }
 
+  .tooltip-model-name {
+    flex: 1;
+    color: #374151;
+  }
+
+  .tooltip-value {
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    color: #111827;
+    font-weight: 600;
+  }
+
   .tooltip-total {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 11px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 13px;
+    color: #6b7280;
     text-align: right;
+  }
+
+  .tooltip-total strong {
+    color: #111827;
+    font-family: 'SF Mono', monospace;
   }
 
   /* X Axis */
