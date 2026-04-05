@@ -16,12 +16,12 @@
 
   const score = 72;
   const signals = [
-    { key: 'freshness', label: t('Live Picture', '实时画面'), status: 'connected' as const, detail: t('Updated just now, suitable for current decisions.', '刚刚更新，适合直接判断。') },
-    { key: 'roster', label: t('Staff & Owners', '员工与负责人'), status: 'connected' as const, detail: t('Staff roster and ownership signals are readable.', '员工名单和负责人信号可读。') },
-    { key: 'live_sessions', label: t('Live Execution', '实时执行'), status: 'connected' as const, detail: t('0 live sessions visible, signal connected.', '实时会话信号已连上；当前无执行中会话。') },
-    { key: 'usage', label: t('AI Usage & Cost', 'AI 用量与费用'), status: 'partial' as const, detail: t('Usage trend visible, subscription snapshot incomplete.', '已能看到用量趋势，订阅快照不完整。') },
-    { key: 'subscription', label: t('Subscription', '订阅额度'), status: 'not_connected' as const, detail: t('Remaining subscription room not confirmed.', '剩余额度尚未确认。') },
-    { key: 'history', label: t('Replay History', '回放历史'), status: 'connected' as const, detail: t('Recent activity and trend history available.', '最近活动和趋势历史可用。') },
+    { label: t('Live Picture', '实时画面'), status: 'connected' as const, detail: t('Updated just now, suitable for current decisions.', '刚刚更新，适合直接判断。') },
+    { label: t('Staff & Owners', '员工与负责人'), status: 'connected' as const, detail: t('Staff roster and ownership signals are readable.', '员工名单和负责人信号可读。') },
+    { label: t('Live Execution', '实时执行'), status: 'connected' as const, detail: t('0 live sessions visible, signal connected.', '实时会话信号已连上；当前无执行中会话。') },
+    { label: t('AI Usage & Cost', 'AI 用量与费用'), status: 'partial' as const, detail: t('Usage trend visible, subscription snapshot incomplete.', '已能看到用量趋势，订阅快照不完整。') },
+    { label: t('Subscription', '订阅额度'), status: 'not_connected' as const, detail: t('Remaining subscription room not confirmed.', '剩余额度尚未确认。') },
+    { label: t('Replay History', '回放历史'), status: 'connected' as const, detail: t('Recent activity and trend history available.', '最近活动和趋势历史可用。') },
   ];
 
   const connectedCount = signals.filter(s => s.status === 'connected').length;

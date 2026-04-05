@@ -1,7 +1,7 @@
 <!-- UpdateStatus.svelte - Update Status Card -->
 <script lang="ts">
   import Card from './common/Card.svelte';
-  import Badge from './common/Badge.svelte';
+  
   import StatusStrip from './common/StatusStrip.svelte';
   import type { UiLanguage } from '../types';
 

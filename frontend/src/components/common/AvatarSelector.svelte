@@ -1,6 +1,6 @@
 <!-- AvatarSelector.svelte - Avatar Customization with Library (Portal Fixed) -->
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { mount, unmount } from 'svelte';
   import AvatarLibrary from './AvatarLibrary.svelte';
 
