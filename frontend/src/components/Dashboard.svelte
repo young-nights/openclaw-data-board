@@ -80,7 +80,7 @@
 
   {:else if section === 'usage-cost'}
     <ActivityPage {language} />
-    <div class="dashboard-grid" style="margin-top: var(--space-lg)">
+    <div style="max-width: 1200px; margin-top: 24px">
       <ContextPressure {language} {loading} />
     </div>
 

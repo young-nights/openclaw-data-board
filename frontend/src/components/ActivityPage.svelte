@@ -157,6 +157,7 @@
   .activity-page {
     max-width: 1200px;
     margin: 0 auto;
+    width: 100%;
   }
 
   .page-header {
@@ -228,12 +229,13 @@
     border-color: #3b82f6;
   }
 
-  /* Metrics Row */
+  /* Metrics Row - wider cards */
   .metrics-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     margin-bottom: 24px;
+    max-width: 1200px;
   }
 
   @media (max-width: 900px) {
