@@ -121,14 +121,18 @@
 
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
-    tooltipX = e.clientX;
-    tooltipY = e.clientY;
+    const target = e.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    tooltipX = rect.left + rect.width / 2;
+    tooltipY = rect.top;
   }
 
   function moveTooltip(e: MouseEvent) {
     if (tooltipDay !== null) {
-      tooltipX = e.clientX;
-      tooltipY = e.clientY;
+      const target = e.currentTarget as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      tooltipX = rect.left + rect.width / 2;
+      tooltipY = rect.top;
     }
   }
 
@@ -230,7 +234,7 @@
 
         <!-- Tooltip -->
         {#if tooltipDay !== null}
-          <div class="tooltip" style="left: {tooltipX}px; top: {tooltipY}px">
+          <div class="tooltip" style="left: {tooltipX}px; top: {tooltipY}px" bind:this={tooltipEl}>
             <div class="tooltip-date">{dayLabels[tooltipDay]}</div>
             <div class="tooltip-body">
               {#each currentModels as model}
@@ -410,7 +414,8 @@
     inset: 16px 0 28px 0;
     display: flex;
     align-items: flex-end;
-    gap: 1px;
+    gap: 2px;
+    padding: 0 4px;
   }
 
   .bar-cell {
@@ -435,10 +440,12 @@
   }
 
   .bar-stack {
-    width: 6px;
-    max-width: 70%;
+    width: 100%;
+    max-width: 32px;
+    min-width: 8px;
     display: flex;
     flex-direction: column-reverse;
+    border-radius: 4px 4px 0 0;
     transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -448,11 +455,15 @@
     transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  /* Tooltip - reference style */
+  .bar-segment:first-child {
+    border-radius: 4px 4px 0 0;
+  }
+
+  /* Tooltip - attached to bar */
   .tooltip {
     position: fixed;
     transform: translate(-50%, -100%);
-    margin-top: -12px;
+    margin-top: -16px;
     z-index: 100;
     pointer-events: none;
     min-width: 180px;
