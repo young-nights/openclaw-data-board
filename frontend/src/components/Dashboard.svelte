@@ -79,9 +79,11 @@
     <DocsSection {language} {loading} />
 
   {:else if section === 'usage-cost'}
-    <ActivityPage {language} />
-    <div style="max-width: 1200px; margin-top: 24px">
-      <ContextPressure {language} {loading} />
+    <div class="usage-page">
+      <ActivityPage {language} />
+      <div class="usage-section">
+        <ContextPressure {language} {loading} />
+      </div>
     </div>
 
   {:else if section === 'settings'}
@@ -183,5 +185,20 @@
     border-radius: var(--radius-full);
     font-size: var(--font-size-xs);
     font-weight: 600;
+  }
+
+  .usage-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .usage-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
   }
 </style>
