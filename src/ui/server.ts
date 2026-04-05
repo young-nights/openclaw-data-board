@@ -932,6 +932,20 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
       const legacySection = resolveLegacyDashboardSection(path);
       const legacyAnchor = resolveLegacyDashboardAnchor(path);
 
+      // Serve new Vite frontend if dist/ exists
+      if (method === "GET" && (path === "/" || legacySection)) {
+        const distIndex = join(process.cwd(), "dist", "index.html");
+        try {
+          const indexHtml = await readFile(distIndex);
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+          res.end(indexHtml);
+          return;
+        } catch {
+          // dist/ not built yet, fall through to old handler
+        }
+      }
+
+      // Legacy HTML handler (fallback when no dist/)
       if (method === "GET" && (path === "/" || legacySection)) {
         const prefs = await loadUiPreferences();
         if (prefs.issues.length > 0) {
@@ -2151,6 +2165,45 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
 
       if (path.startsWith("/api/")) {
         return writeApiError(res, 404, "NOT_FOUND", "API route not found.");
+      }
+
+      // Serve static files from dist/ (Vite build output)
+      if (method === "GET") {
+        const distDir = join(process.cwd(), "dist");
+        let filePath = path === "/" ? "/index.html" : path;
+        const fullPath = join(distDir, filePath);
+        try {
+          const content = await readFile(fullPath);
+          const ext = extname(fullPath);
+          const mimeTypes: Record<string, string> = {
+            '.html': 'text/html; charset=utf-8',
+            '.js': 'application/javascript',
+            '.css': 'text/css',
+            '.json': 'application/json',
+            '.svg': 'image/svg+xml',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.ico': 'image/x-icon',
+            '.map': 'application/json',
+          };
+          const contentType = mimeTypes[ext] ?? 'application/octet-stream';
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000',
+          });
+          res.end(content);
+          return;
+        } catch {
+          // File not found in dist/, fall through to 404 or serve index.html for SPA routing
+          try {
+            const indexHtml = await readFile(join(distDir, 'index.html'));
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+            res.end(indexHtml);
+            return;
+          } catch {
+            // No dist/index.html yet, fall through
+          }
+        }
       }
 
       return writeText(res, 404, "Not Found", "text/plain; charset=utf-8");

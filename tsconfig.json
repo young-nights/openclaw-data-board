@@ -1,12 +1,28 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "strict": true,
-    "outDir": "dist",
-    "esModuleInterop": true,
-    "skipLibCheck": true
+    "target": "ES2022",                    // 目标语法：现代 Node.js 支持的最新特性
+    "module": "ESNext",                    // 改成 ESNext，与 "type": "module" 完全匹配
+    "moduleResolution": "node16",          // 推荐的现代模块解析方式（Node.js 16+）
+    "strict": true,                        // 严格类型检查，推荐保留
+    "outDir": "./dist",                    // 编译后的 JS 输出到 dist 目录
+    "rootDir": "./src",                    // 指定源代码根目录，避免路径混乱
+    "esModuleInterop": true,               // 允许 import CommonJS 模块
+    "skipLibCheck": true,                  // 跳过第三方库类型检查，加快编译
+    "forceConsistentCasingInFileNames": true, // 强制文件名大小写一致（防止 Windows → Ubuntu 路径问题）
+    "resolveJsonModule": true,             // 允许 import *.json 文件
+    
+    // 以下两个设置对 ESM 项目特别重要
+    "verbatimModuleSyntax": true,          // 保留 import/export 不做转换
+    "isolatedModules": true                // 确保每个文件都能被单独编译（Vite/Svelte 友好）
   },
-  "include": ["src/**/*.ts"]
+  
+  "include": [
+    "src/**/*.ts"                          // 只编译 src 目录下的 TypeScript 文件
+  ],
+  
+  "exclude": [
+    "node_modules",                        // 排除不需要编译的内容
+    "dist",
+    "frontend"                             // 重要：排除前端目录（前端由 Vite 处理）
+  ]
 }

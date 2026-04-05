@@ -24,7 +24,7 @@ import { startUiServer } from "./ui/server";
 
 const CONTINUOUS_MODE = process.env.MONITOR_CONTINUOUS === "true";
 const UI_MODE = process.env.UI_MODE === "true";
-const UI_PORT = Number.parseInt(process.env.UI_PORT ?? "4310", 10);
+const UI_PORT = Number.parseInt(process.env.UI_PORT ?? "4330", 10);
 const COMMAND = normalizeCommand(process.env.APP_COMMAND ?? process.argv[2]);
 const COMMAND_ARG =
   process.env.COMMAND_ARG ??
