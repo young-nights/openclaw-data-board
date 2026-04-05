@@ -19,7 +19,7 @@
 
   function showTooltip(idx: number, el: HTMLElement) {
     tooltipDay = idx;
-    const chartArea = el.closest('.chart-area') as HTMLElement;
+    const chartArea = el.closest('.chart-row') as HTMLElement;
     if (chartArea) {
       const cr = chartArea.getBoundingClientRect();
       const br = el.getBoundingClientRect();
@@ -30,7 +30,7 @@
 
   function onMouseMove(e: MouseEvent) {
     if (tooltipDay !== null) {
-      const chartArea = (e.currentTarget as HTMLElement).closest('.chart-area') as HTMLElement;
+      const chartArea = (e.currentTarget as HTMLElement).closest('.chart-row') as HTMLElement;
       if (chartArea) {
         const cr = chartArea.getBoundingClientRect();
         tooltipY = e.clientY - cr.top;
@@ -216,7 +216,16 @@
           {/each}
         </div>
 
-        <!-- Tooltip -->
+        <!-- X Axis -->
+        <div class="x-axis">
+          {#each dayLabels as label, i}
+            <span class="x-label" class:visible={shouldShowLabel(i)}>{shouldShowLabel(i) ? label : ''}</span>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Tooltip - outside chart-area to avoid overflow:hidden -->
+      <div class="tooltip-wrap">
         {#if tooltipDay !== null}
           <div class="tooltip" style="--tx: {tooltipX}px; --ty: {tooltipY}px">
             <div class="tooltip-date">{dayLabels[tooltipDay]}, 2026 at 8:00 AM</div>
@@ -237,13 +246,6 @@
             </div>
           </div>
         {/if}
-
-        <!-- X Axis -->
-        <div class="x-axis">
-          {#each dayLabels as label, i}
-            <span class="x-label" class:visible={shouldShowLabel(i)}>{shouldShowLabel(i) ? label : ''}</span>
-          {/each}
-        </div>
       </div>
     </div>
 
@@ -359,7 +361,6 @@
   .chart-area {
     flex: 1;
     position: relative;
-    overflow: hidden;
     padding: 16px 16px 0 0;
   }
 
@@ -463,6 +464,10 @@
 
   .x-label.visible {
     visibility: visible;
+  }
+
+  .tooltip-wrap {
+    position: relative;
   }
 
   /* Tooltip */
