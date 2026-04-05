@@ -244,7 +244,7 @@
                     <div class="detail-section">
                       <div class="detail-title">{t('Daily Requests (Last 7 Days)', '每日请求数（近 7 天）')}</div>
                       <div class="line-chart-wrap">
-                        <svg viewBox="0 0 600 130" class="line-chart-svg">
+                        <svg viewBox="0 0 800 130" class="line-chart-svg">
                           <!-- Grid -->
                           {#each [0, 25, 50, 75, 100] as pct}
                             <line x1="30" y1={90 - pct * 0.7} x2="370" y2={90 - pct * 0.7} stroke="#f3f4f6" stroke-width="1" />
@@ -466,7 +466,7 @@
   .detail-section { margin-bottom: 16px; }
   .detail-title { font-size: 15px; font-weight: 700; color: #374151; margin-bottom: 12px; }
   .line-chart-wrap { margin-bottom: 16px; }
-  .line-chart-svg { width: 100%; height: 130px; }
+  .line-chart-svg { width: 100%; height: 160px; }
   .detail-stats { display: flex; gap: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; }
   .detail-stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-label { font-size: 13px; color: #9ca3af; font-weight: 500; }
