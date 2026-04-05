@@ -121,15 +121,18 @@
 
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
-    tooltipX = e.clientX;
-    tooltipY = e.clientY;
+    const target = e.currentTarget as HTMLElement;
+    const chartArea = target.closest('.chart-area');
+    if (target && chartArea) {
+      const barRect = target.getBoundingClientRect();
+      const chartRect = chartArea.getBoundingClientRect();
+      tooltipX = barRect.left - chartRect.left + barRect.width / 2;
+      tooltipY = barRect.top - chartRect.top;
+    }
   }
 
   function moveTooltip(e: MouseEvent) {
-    if (tooltipDay !== null) {
-      tooltipX = e.clientX;
-      tooltipY = e.clientY;
-    }
+    // Tooltip position is set on enter, no need to update on move
   }
 
   function hideTooltip() { tooltipDay = null; }
@@ -231,7 +234,7 @@
 
         <!-- Tooltip -->
         {#if tooltipDay !== null}
-          <div class="tooltip" style="--tooltip-x: {tooltipX}px; --tooltip-y: {tooltipY}px" bind:this={tooltipEl}>
+          <div class="tooltip" style="--tooltip-x: {tooltipX}px; --tooltip-y: {tooltipY}px">
             <div class="tooltip-date">{dayLabels[tooltipDay]}</div>
             <div class="tooltip-body">
               {#each currentModels as model}
@@ -460,12 +463,13 @@
     border-radius: 4px 4px 0 0;
   }
 
-  /* Tooltip - follow mouse */
+  /* Tooltip - attached to bar */
   .tooltip {
-    position: fixed;
-    left: calc(var(--tooltip-x) - 12px);
+    position: absolute;
+    left: var(--tooltip-x);
     top: var(--tooltip-y);
-    transform: translateY(-50%);
+    transform: translate(-50%, -100%);
+    margin-top: -12px;
     z-index: 100;
     pointer-events: none;
     min-width: 160px;
