@@ -370,6 +370,10 @@
     display: flex;
     gap: 0;
     height: 320px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fafafa;
+    overflow: hidden;
   }
 
   .y-axis {
@@ -415,7 +419,6 @@
     display: flex;
     align-items: flex-end;
     gap: 2px;
-    padding: 0 4px;
   }
 
   .bar-cell {
