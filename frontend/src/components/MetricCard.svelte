@@ -37,7 +37,7 @@
       <div class="skeleton-line" style="width: 70%;"></div>
     </div>
   {:else}
-    <!-- Header -->
+    <!-- Header - compact -->
     <div class="card-header">
       <span class="card-title">{title}</span>
       {#if onClick}
@@ -45,10 +45,10 @@
       {/if}
     </div>
 
-    <!-- Main Value -->
+    <!-- Main Value - smaller to give chart space -->
     <div class="card-value">{value}</div>
 
-    <!-- Mini Chart -->
+    <!-- Mini Chart - takes most of card space -->
     {#if chartData && chartData.length > 0}
       <div class="mini-chart">
         {#each chartData as val}
@@ -88,11 +88,11 @@
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 16px;
-    padding: 32px 32px 28px;
+    padding: 20px 24px 16px;
     transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
     cursor: default;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    min-height: 280px;
+    min-height: 320px;
     display: flex;
     flex-direction: column;
   }
@@ -110,11 +110,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   .card-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #6b7280;
   }
@@ -124,7 +124,7 @@
     border: none;
     color: #9ca3af;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     padding: 4px;
     border-radius: 6px;
     transition: all 120ms;
@@ -136,29 +136,29 @@
   }
 
   .card-value {
-    font-size: 40px;
+    font-size: 28px;
     font-weight: 700;
     color: #111827;
     line-height: 1.1;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
     letter-spacing: -0.02em;
   }
 
-  /* Mini Chart - moderate bars */
+  /* Mini Chart - takes most of card space */
   .mini-chart {
     display: flex;
     align-items: flex-end;
     gap: 2px;
-    height: 80px;
-    margin-bottom: 20px;
-    padding: 0 2px;
     flex: 1;
+    min-height: 100px;
+    margin-bottom: 16px;
+    padding: 0 2px;
   }
 
   .mini-bar {
-    width: 4px;
-    flex: none;
+    width: 5px;
+    flex: 1;
     border-radius: 2px 2px 0 0;
     transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1);
     min-height: 1px;
@@ -168,8 +168,8 @@
   .model-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 12px;
+    gap: 5px;
+    margin-bottom: 8px;
   }
 
   .model-row {
@@ -198,8 +198,8 @@
   }
 
   .total-row {
-    margin-top: 4px;
-    padding-top: 6px;
+    margin-top: 2px;
+    padding-top: 5px;
     border-top: 1px solid #f3f4f6;
   }
 
@@ -210,7 +210,7 @@
   }
 
   .card-subtitle {
-    font-size: 12px;
+    font-size: 11px;
     color: #9ca3af;
     line-height: 1.4;
   }

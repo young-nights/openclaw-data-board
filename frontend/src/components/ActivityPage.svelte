@@ -65,10 +65,20 @@
       .map(m => ({ name: m.name, value: formatNum(m.tokens), color: m.color }))
   );
 
-  // Mini chart data for the cards (last 7 days)
-  const spendChartData = [0.01, 0.005, 0.02, 0.015, 0.08, 0.06, 0.07];
-  const requestsChartData = [120, 80, 200, 150, 350, 280, 310];
-  const tokensChartData = [15000, 8000, 25000, 18000, 65000, 48000, 55000];
+  // Mini chart data for the cards (30 days, oldest left → newest right)
+  function genMiniData(spike: number, spikeDay: number): number[] {
+    return Array.from({ length: 30 }, (_, i) => {
+      if (i < spikeDay - 5) return Math.round(spike * 0.1 * (0.3 + Math.random() * 0.7));
+      if (i < spikeDay) return Math.round(spike * 0.1 * (1 + (i - spikeDay + 5) * 0.4));
+      if (i === spikeDay) return spike;
+      if (i < spikeDay + 5) return Math.round(spike * (0.2 + Math.random() * 0.3));
+      return Math.round(spike * (0.3 + Math.random() * 0.4));
+    });
+  }
+
+  const spendChartData = genMiniData(8, 28);
+  const requestsChartData = genMiniData(350, 28);
+  const tokensChartData = genMiniData(65000, 28);
 
   function handleRefresh() {
     lastUpdated = new Date();
