@@ -2,6 +2,7 @@
 <script lang="ts">
   import MetricCard from './MetricCard.svelte';
   import DetailPanel from './DetailPanel.svelte';
+  import SubscriptionUsage from './SubscriptionUsage.svelte';
   import type { UiLanguage } from '../types';
 
   let { language }: { language: UiLanguage } = $props();
@@ -224,6 +225,9 @@
     <MetricCard title="Tokens" value="633M" subtitle="" color="tokens" icon="🔢"
       chartData={tokensChartData} modelBreakdown={tokensModels} onClick={() => openDetail('tokens')} />
   </div>
+
+  <!-- Subscription Usage Details -->
+  <SubscriptionUsage {language} />
 
   {#if detailView}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
