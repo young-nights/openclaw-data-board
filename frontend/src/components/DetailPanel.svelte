@@ -466,7 +466,7 @@
     top: var(--ty);
     transform: translate(-50%, -100%);
     margin-top: -8px;
-    z-index: 9999;
+    z-index: 100;
     pointer-events: none;
     min-width: 220px;
     background: #ffffff;
