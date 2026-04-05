@@ -319,7 +319,7 @@
 
   .filter-select {
     padding: 8px 14px;
-    border: 1px solid #e5e7eb;
+    border: none;
     border-radius: 10px;
     font-size: 12px;
     color: #374151;
@@ -329,7 +329,7 @@
   .close-btn {
     width: 36px;
     height: 36px;
-    border: 1px solid #e5e7eb;
+    border: none;
     background: #fff;
     border-radius: 50%;
     cursor: pointer;
@@ -348,8 +348,8 @@
 
   /* Chart - overflow hidden clips bars */
   .chart-wrapper {
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
+    border: none;
+    border-radius: 0;
     overflow: hidden;
     margin-bottom: 20px;
   }
@@ -357,9 +357,9 @@
   .chart-container {
     display: flex;
     flex-direction: column;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    background: #fafafa;
+    border: none;
+    border-radius: 0;
+    background: transparent;
     overflow: hidden;
   }
 
