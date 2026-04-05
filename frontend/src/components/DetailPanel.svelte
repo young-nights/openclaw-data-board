@@ -1,4 +1,4 @@
-<!-- DetailPanel.svelte - OpenRouter-style Detail View (Fixed) -->
+<!-- DetailPanel.svelte - Activity Detail View -->
 <script lang="ts">
   import type { UiLanguage } from '../types';
 
@@ -9,34 +9,31 @@
     onClose: () => void;
   } = $props();
 
-  function t(en: string, zh: string): string {
-    return language === 'zh' ? zh : en;
-  }
-
-  let tokenFilter = $state<'total' | 'prompt' | 'completion' | 'reasoning' | 'cached'>('total');
   let sortKey = $state<string>('sum');
   let sortAsc = $state(false);
+  let hoveredBarIdx = $state<number | null>(null);
+  let hoveredModel = $state<string | null>(null);
 
   const config = {
-    spend: { title: t('Spend By Model', '按模型花费'), unit: '$' },
-    requests: { title: t('Requests By Model', '按模型请求数'), unit: '' },
-    tokens: { title: t('Tokens By Model', '按模型 Token'), unit: '' },
+    spend: { title: 'Spend By Model', unit: '$' },
+    requests: { title: 'Requests By Model', unit: '' },
+    tokens: { title: 'Tokens By Model', unit: '' },
   };
   const cfg = $derived(config[viewType]);
 
-  // Generate labels and data based on timeRange
+  // Time range → labels + bar count
   function getLabelsAndCount(range: string): { labels: string[]; count: number } {
     if (range === '1h') return { labels: Array.from({ length: 12 }, (_, i) => `${i * 5}m`), count: 12 };
     if (range === '1d') return { labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), count: 24 };
     if (range === '7d') {
       return {
-        labels: Array.from({ length: 7 }, (_, i) => new Date(2026, 3, 1 + i).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 8:00 AM'),
+        labels: Array.from({ length: 7 }, (_, i) => new Date(2026, 3, 1 + i).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
         count: 7
       };
     }
     if (range === '1m') {
       return {
-        labels: Array.from({ length: 30 }, (_, i) => new Date(2026, 2, 6 + i).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 8:00 AM'),
+        labels: Array.from({ length: 30 }, (_, i) => new Date(2026, 2, 6 + i).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
         count: 30
       };
     }
@@ -75,76 +72,37 @@
 
   const currentModels = $derived(models[viewType]);
 
-  // Max stacked value
   const maxStacked = $derived(
     Math.max(...dayLabels.map((_, i) =>
       currentModels.reduce((sum, m) => sum + m.data[i], 0)
     ))
   );
 
-  // Nice Y-axis max
+  // Y-axis
   function niceMax(v: number): number {
     if (viewType === 'spend') {
       const steps = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
-      const target = v * 1.15;
-      return steps.find(s => s >= target) ?? Math.ceil(target * 10) / 10;
+      return steps.find(s => s >= v * 1.15) ?? Math.ceil(v * 1.15 * 10) / 10;
     }
-    // For requests and tokens
     const target = v * 1.15;
-    if (target <= 10) return 10;
-    if (target <= 50) return 50;
-    if (target <= 100) return 100;
-    if (target <= 250) return 250;
-    if (target <= 500) return 500;
-    if (target <= 1000) return 1000;
-    if (target <= 2000) return 2000;
-    if (target <= 3000) return 3000;
-    if (target <= 5000) return 5000;
-    if (target <= 10000) return 10000;
-    if (target <= 50000) return 50000;
-    if (target <= 100000) return 100000;
-    if (target <= 500000) return 500000;
-    if (target <= 1000000) return 1000000;
-    const mag = Math.pow(10, Math.floor(Math.log10(target)));
-    const norm = target / mag;
-    const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
-    return nice * mag;
+    const steps = [10, 50, 100, 250, 500, 1000, 2000, 3000, 5000, 10000, 50000, 100000, 500000, 1000000];
+    return steps.find(s => s >= target) ?? Math.ceil(target);
   }
 
   const yMax = $derived(niceMax(maxStacked || 1));
 
   function yLabelsFromMax(max: number): string[] {
     if (viewType === 'spend') {
-      return [0, 1, 2, 3, 4].map(i => {
-        const v = max * i / 4;
-        return v === 0 ? '$0' : `$${v.toFixed(2)}`;
-      }).reverse();
+      return [0, 1, 2, 3, 4].map(i => max * i / 4).reverse().map(v => v === 0 ? '$0' : `$${v.toFixed(2)}`);
     }
-    return [0, 1, 2, 3, 4].map(i => {
-      const v = max * i / 4;
+    return [0, 1, 2, 3, 4].map(i => max * i / 4).reverse().map(v => {
       if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
       if (v >= 1000) return `${Math.round(v / 1000)}K`;
       return String(Math.round(v));
-    }).reverse();
+    });
   }
 
   const currentYLabels = $derived(yLabelsFromMax(yMax));
-
-  // Hover state
-  let hoveredBarIdx = $state<number | null>(null);
-  let hoveredModel = $state<string | null>(null);
-
-  function highlightModel(modelName: string | null) {
-    hoveredModel = modelName;
-  }
-
-
-  function formatVal(v: number): string {
-    if (viewType === 'spend') return `$${v < 0.01 ? v.toFixed(3) : v.toFixed(2)}`;
-    if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
-    if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
-    return String(v);
-  }
 
   // Table data
   let tableData = $state([
@@ -162,18 +120,8 @@
     });
   }
 
-  function exportCSV() {
-    const csv = ['Model,Min,Max,Avg,Sum', ...tableData.map(r => `${r.model},${r.min},${r.max},${r.avg},${r.sum}`)].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `activity-${viewType}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // X-axis: show labels based on count
   function shouldShowLabel(idx: number): boolean {
-    if (barCount <= 12) return true; // show all for small counts
+    if (barCount <= 12) return true;
     return idx % Math.ceil(barCount / 8) === 0 || idx === dayLabels.length - 1;
   }
 </script>
@@ -181,23 +129,11 @@
 <div class="detail-panel">
   <div class="detail-header">
     <h3>{cfg.title}</h3>
-    <div class="header-right">
-      {#if viewType === 'tokens'}
-        <select class="filter-select" bind:value={tokenFilter}>
-          <option value="total">Total</option>
-          <option value="prompt">Prompt</option>
-          <option value="completion">Completion</option>
-          <option value="reasoning">Reasoning</option>
-          <option value="cached">Cached</option>
-        </select>
-      {/if}
-      <button class="close-btn" onclick={onClose}>✕</button>
-    </div>
+    <button class="close-btn" onclick={onClose}>✕</button>
   </div>
 
-  <!-- Chart with overflow hidden -->
   <div class="chart-wrapper">
-    <div class="chart-container">
+    <div class="chart-row">
       <!-- Y Axis -->
       <div class="y-axis">
         {#each currentYLabels as label}
@@ -205,7 +141,7 @@
         {/each}
       </div>
 
-      <!-- Chart Area (overflow hidden clips bars) -->
+      <!-- Chart Area -->
       <div class="chart-area">
         <div class="chart-grid">
           {#each currentYLabels as _}
@@ -222,24 +158,24 @@
               class="bar-cell"
               class:active={hoveredBarIdx === i}
               onmouseenter={() => { hoveredBarIdx = i; }}
-              onmouseleave={() => { hoveredBarIdx = null; }}
+              onmouseleave={() => { hoveredBarIdx = null; hoveredModel = null; }}
             >
               <div class="bar-stack" style="height: {Math.min(pct, 100)}%">
                 {#each currentModels.slice().reverse() as model}
                   {@const mpct = yMax > 0 ? (model.data[i] / yMax) * 100 : 0}
-                  <div class="bar-segment" 
+                  <div
+                    class="bar-segment"
                     style="height: {Math.min(mpct, 100)}%; background: {model.color}"
                     class:dimmed={hoveredModel !== null && hoveredModel !== model.name}
                     class:highlighted={hoveredModel === model.name}
-                    onmouseenter={() => highlightModel(model.name)}
-                    onmouseleave={() => highlightModel(null)}
+                    onmouseenter={() => { hoveredModel = model.name; }}
+                    onmouseleave={() => { hoveredModel = null; }}
                   ></div>
                 {/each}
               </div>
             </div>
           {/each}
         </div>
-
 
         <!-- X Axis -->
         <div class="x-axis">
@@ -248,45 +184,45 @@
           {/each}
         </div>
       </div>
+    </div>
 
-      <!-- Table -->
-      <div class="table-container">
-    <table class="detail-table">
-      <thead>
-        <tr>
-          <th class="sortable" onclick={() => handleSort('model')}>
-            Model <span class="sort-ico">{sortKey === 'model' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-          </th>
-          <th class="num sortable" onclick={() => handleSort('min')}>
-            Min <span class="sort-ico">{sortKey === 'min' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-          </th>
-          <th class="num sortable" onclick={() => handleSort('max')}>
-            Max <span class="sort-ico">{sortKey === 'max' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-          </th>
-          <th class="num sortable" onclick={() => handleSort('avg')}>
-            Avg <span class="sort-ico">{sortKey === 'avg' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-          </th>
-          <th class="num sortable highlight" onclick={() => handleSort('sum')}>
-            Sum <span class="sort-ico">{sortKey === 'sum' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each tableData as row}
+    <!-- Table -->
+    <div class="table-container">
+      <table class="detail-table">
+        <thead>
           <tr>
-            <td class="model-cell">
-              <span class="model-dot" style="background: {row.color}"></span>
-              {row.model}
-            </td>
-            <td class="num">{row.min}</td>
-            <td class="num">{row.max}</td>
-            <td class="num">{row.avg}</td>
-            <td class="num highlight">{row.sum}</td>
+            <th class="sortable" onclick={() => handleSort('model')}>
+              Model <span class="sort-ico">{sortKey === 'model' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            </th>
+            <th class="num sortable" onclick={() => handleSort('min')}>
+              Min <span class="sort-ico">{sortKey === 'min' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            </th>
+            <th class="num sortable" onclick={() => handleSort('max')}>
+              Max <span class="sort-ico">{sortKey === 'max' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            </th>
+            <th class="num sortable" onclick={() => handleSort('avg')}>
+              Avg <span class="sort-ico">{sortKey === 'avg' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            </th>
+            <th class="num sortable highlight" onclick={() => handleSort('sum')}>
+              Sum <span class="sort-ico">{sortKey === 'sum' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            </th>
           </tr>
-        {/each}
-      </tbody>
-    </table>
-      </div>
+        </thead>
+        <tbody>
+          {#each tableData as row}
+            <tr>
+              <td class="model-cell">
+                <span class="model-dot" style="background: {row.color}"></span>
+                {row.model}
+              </td>
+              <td class="num">{row.min}</td>
+              <td class="num">{row.max}</td>
+              <td class="num">{row.avg}</td>
+              <td class="num highlight">{row.sum}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -311,26 +247,11 @@
     margin: 0;
   }
 
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .filter-select {
-    padding: 8px 14px;
-    border: none;
-    border-radius: 10px;
-    font-size: 12px;
-    color: #374151;
-    background: #fff;
-  }
-
   .close-btn {
     width: 36px;
     height: 36px;
     border: none;
-    background: #fff;
+    background: #f3f4f6;
     border-radius: 50%;
     cursor: pointer;
     font-size: 16px;
@@ -342,33 +263,29 @@
   }
 
   .close-btn:hover {
-    background: #f3f4f6;
+    background: #e5e7eb;
     color: #111827;
   }
 
-  /* Chart - overflow hidden clips bars */
+  /* Chart */
   .chart-wrapper {
-    border: none;
-    border-radius: 0;
     overflow: hidden;
     margin-bottom: 20px;
   }
 
-  .chart-container {
+  .chart-row {
     display: flex;
-    flex-direction: column;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    overflow: hidden;
+    gap: 0;
+    height: 420px;
+    margin-bottom: 20px;
   }
 
   .y-axis {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 16px 12px 28px 16px;
-    min-width: 56px;
+    padding: 16px 12px 28px 8px;
+    min-width: 48px;
   }
 
   .y-label {
@@ -383,7 +300,6 @@
     position: relative;
     overflow: hidden;
     padding: 16px 16px 0 0;
-    contain: layout;
   }
 
   .chart-grid {
@@ -399,7 +315,7 @@
     width: 100%;
   }
 
-  /* Bars - stacked, one per day */
+  /* Bars */
   .bars-row {
     position: absolute;
     inset: 16px 0 28px 0;
@@ -462,10 +378,8 @@
 
   .bar-segment.highlighted {
     filter: brightness(1.2);
-    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
   }
-
-  
 
   /* X Axis */
   .x-axis {
@@ -491,7 +405,9 @@
   }
 
   /* Table */
-  .table-container { overflow-x: auto; }
+  .table-container {
+    overflow-x: auto;
+  }
 
   .detail-table {
     width: 100%;
@@ -508,15 +424,23 @@
     white-space: nowrap;
   }
 
-  .detail-table th.num { text-align: right; }
-  .detail-table th.highlight { color: #111827; font-weight: 600; }
+  .detail-table th.num {
+    text-align: right;
+  }
+
+  .detail-table th.highlight {
+    color: #111827;
+    font-weight: 600;
+  }
 
   .sortable {
     cursor: pointer;
     user-select: none;
   }
 
-  .sortable:hover { color: #111827; }
+  .sortable:hover {
+    color: #111827;
+  }
 
   .sort-ico {
     font-size: 10px;
@@ -559,5 +483,7 @@
     flex-shrink: 0;
   }
 
-  .detail-table tbody tr:hover { background: #f9fafb; }
+  .detail-table tbody tr:hover {
+    background: #f9fafb;
+  }
 </style>
