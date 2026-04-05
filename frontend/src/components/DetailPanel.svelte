@@ -351,14 +351,14 @@
   .header-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .filter-select {
     padding: 8px 14px;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
-    font-size: 13px;
+    font-size: 12px;
     color: #374151;
     background: #fff;
   }
@@ -511,7 +511,7 @@
     transform: translate(0, -50%);
     z-index: 100;
     pointer-events: none;
-    min-width: 180px;
+    min-width: 140px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
     border-radius: 10px;
     overflow: hidden;
@@ -537,7 +537,7 @@
     color: #ffffff;
     font-size: 12px;
     font-weight: 500;
-    padding: 8px 12px;
+    padding: 5px 10px;
     text-align: center;
   }
 
@@ -549,9 +549,9 @@
   .tooltip-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    padding: 4px 8px;
+    gap: 6px;
+    font-size: 12px;
+    padding: 3px 6px;
     border-radius: 4px;
     transition: background 150ms;
   }
@@ -575,7 +575,7 @@
 
   .tooltip-value {
     font-family: 'SF Mono', monospace;
-    font-size: 13px;
+    font-size: 12px;
     color: #111827;
     font-weight: 600;
   }
@@ -584,7 +584,7 @@
     margin-top: 6px;
     padding-top: 8px;
     border-top: 1px solid #e5e7eb;
-    font-size: 13px;
+    font-size: 12px;
     color: #6b7280;
     text-align: right;
   }
@@ -662,7 +662,7 @@
   .detail-table td.num {
     text-align: right;
     font-family: 'SF Mono', monospace;
-    font-size: 13px;
+    font-size: 12px;
     color: #6b7280;
   }
 
@@ -676,7 +676,7 @@
     align-items: center;
     gap: 10px;
     font-family: 'SF Mono', monospace;
-    font-size: 13px;
+    font-size: 12px;
     color: #111827;
   }
 
