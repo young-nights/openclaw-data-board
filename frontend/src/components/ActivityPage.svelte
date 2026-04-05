@@ -128,9 +128,9 @@
     />
   </div>
 
-  <!-- Detail Panel -->
+  <!-- Detail Overlay (full page) -->
   {#if detailView}
-    <div class="detail-section">
+    <div class="detail-overlay">
       <DetailPanel
         viewType={detailView}
         {language}
@@ -241,9 +241,26 @@
     }
   }
 
-  /* Detail Section */
-  .detail-section {
-    margin-bottom: 24px;
+  /* Detail Overlay - full page */
+  .detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: #ffffff;
+    z-index: 100;
+    overflow-y: auto;
+    padding: 40px;
+    animation: fadeIn 200ms ease-out;
+  }
+
+  @media (max-width: 900px) {
+    .detail-overlay {
+      padding: 20px;
+    }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   /* Footer */

@@ -137,20 +137,22 @@
     letter-spacing: -0.02em;
   }
 
-  /* Mini Chart */
+  /* Mini Chart - thin tall bars */
   .mini-chart {
     display: flex;
     align-items: flex-end;
-    gap: 3px;
-    height: 48px;
+    gap: 2px;
+    height: 64px;
     margin-bottom: 16px;
+    padding: 0 4px;
   }
 
   .mini-bar {
-    flex: 1;
-    border-radius: 2px 2px 0 0;
+    width: 3px;
+    flex: none;
+    border-radius: 1.5px 1.5px 0 0;
     transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1);
-    min-height: 2px;
+    min-height: 1px;
   }
 
   /* Model Breakdown */

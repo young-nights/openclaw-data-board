@@ -26,7 +26,7 @@
   // Daily data - one bar per day (30 days)
   const dayLabels = Array.from({ length: 30 }, (_, i) => {
     const d = new Date(2026, 2, 6 + i);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 8:00 AM';
   });
 
   function genDaily(base: number, spike: number, spikeDay: number): number[] {
@@ -82,7 +82,10 @@
 
   function yLabelsFromMax(max: number): string[] {
     if (viewType === 'spend') {
-      return [0, 1, 2, 3, 4].map(i => `$${(max * i / 4).toFixed(2)}`).reverse();
+      return [0, 1, 2, 3, 4].map(i => {
+        const v = max * i / 4;
+        return v === 0 ? '0' : `$${v.toFixed(2)}`;
+      }).reverse();
     }
     return [0, 1, 2, 3, 4].map(i => {
       const v = max * i / 4;
@@ -144,9 +147,9 @@
     URL.revokeObjectURL(url);
   }
 
-  // X-axis: show every 5th label
+  // X-axis: show every 7th label (weekly)
   function shouldShowLabel(idx: number): boolean {
-    return idx % 5 === 0 || idx === dayLabels.length - 1;
+    return idx % 7 === 0 || idx === dayLabels.length - 1;
   }
 </script>
 
@@ -163,8 +166,7 @@
           <option value="cached">Cached</option>
         </select>
       {/if}
-      <button class="icon-btn" onclick={exportCSV}>📥</button>
-      <button class="icon-btn close-btn" onclick={onClose}>✕</button>
+      <button class="close-btn" onclick={onClose}>✕</button>
     </div>
   </div>
 
@@ -279,23 +281,19 @@
 
 <style>
   .detail-panel {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-    animation: slideUp 250ms ease-out;
+    max-width: 900px;
+    margin: 0 auto;
   }
 
   .detail-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
   .detail-header h3 {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     color: #111827;
     margin: 0;
@@ -308,29 +306,33 @@
   }
 
   .filter-select {
-    padding: 6px 12px;
+    padding: 8px 14px;
     border: 1px solid #e5e7eb;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 13px;
     color: #374151;
     background: #fff;
   }
 
-  .icon-btn {
-    width: 32px;
-    height: 32px;
+  .close-btn {
+    width: 36px;
+    height: 36px;
     border: 1px solid #e5e7eb;
     background: #fff;
-    border-radius: 8px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 120ms;
+    color: #6b7280;
   }
 
-  .icon-btn:hover { background: #f9fafb; }
+  .close-btn:hover {
+    background: #f3f4f6;
+    color: #111827;
+  }
 
   /* Chart - overflow hidden clips bars */
   .chart-wrapper {
@@ -343,7 +345,7 @@
   .chart-container {
     display: flex;
     gap: 0;
-    height: 260px;
+    height: 320px;
   }
 
   .y-axis {
@@ -395,8 +397,13 @@
     height: 100%;
     display: flex;
     align-items: flex-end;
+    justify-content: center;
     cursor: pointer;
     position: relative;
+  }
+
+  .bar-cell:hover .bar-stack {
+    filter: brightness(1.1);
   }
 
   .bar-cell:hover::after {
@@ -407,7 +414,8 @@
   }
 
   .bar-stack {
-    width: 100%;
+    width: 4px;
+    max-width: 60%;
     display: flex;
     flex-direction: column-reverse;
     transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -486,7 +494,7 @@
 
   .x-label {
     flex: 1;
-    font-size: 10px;
+    font-size: 11px;
     color: #9ca3af;
     text-align: center;
     white-space: nowrap;
