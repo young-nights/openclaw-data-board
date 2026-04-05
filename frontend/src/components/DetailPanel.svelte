@@ -463,7 +463,7 @@
   /* Tooltip - follow mouse */
   .tooltip {
     position: fixed;
-    left: var(--tooltip-x);
+    left: calc(var(--tooltip-x) - 12px);
     top: var(--tooltip-y);
     transform: translateY(-50%);
     z-index: 100;
