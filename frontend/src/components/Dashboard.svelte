@@ -1,4 +1,4 @@
-<!-- Dashboard.svelte - Main Dashboard Container (Updated with all components) -->
+<!-- Dashboard.svelte - Main Dashboard Container (Final) -->
 <script lang="ts">
   import Card from './common/Card.svelte';
   import GlobalVisibility from './GlobalVisibility.svelte';
@@ -40,7 +40,7 @@
   {/if}
 
   {#if section === 'overview'}
-    <div class="dashboard-grid overview-grid">
+    <div class="dashboard-grid">
       <div class="full-width">
         <GlobalVisibility {language} {loading} />
       </div>
@@ -57,76 +57,65 @@
     <BrainSection {language} items={brainTimeline} {loading} expanded />
 
   {:else if section === 'team'}
-    <div class="dashboard-grid team-grid">
+    <div class="dashboard-grid">
       <TeamOverview {language} {loading} />
       <OfficeSpace {language} {loading} />
     </div>
 
   {:else if section === 'projects-tasks'}
-    <div class="dashboard-grid tasks-grid">
+    <div class="dashboard-grid">
       <TaskBoard {language} {loading} />
       <TaskCertainty {language} {loading} />
     </div>
 
   {:else if section === 'collaboration'}
-    <div class="dashboard-grid collab-grid">
-      <Collaboration {language} {loading} />
-    </div>
+    <Collaboration {language} {loading} />
 
   {:else if section === 'memory'}
-    <div class="dashboard-grid memory-grid">
-      <MemoryStatus {language} {loading} />
-    </div>
+    <MemoryStatus {language} {loading} />
 
   {:else if section === 'docs'}
-    <div class="dashboard-grid docs-grid">
-      <DocsSection {language} {loading} />
-    </div>
+    <DocsSection {language} {loading} />
 
   {:else if section === 'usage-cost'}
-    <div class="dashboard-grid usage-grid">
+    <div class="dashboard-grid">
       <UsageCost {language} {loading} />
       <ContextPressure {language} {loading} />
     </div>
 
   {:else if section === 'settings'}
-    <div class="dashboard-grid settings-grid">
-      <Card title={t('Settings', '设置')} subtitle={t('Security, connectors, and preferences', '安全、数据连接和偏好设置')}>
+    <div class="dashboard-grid">
+      <Card title={t('Settings', '设置')} subtitle={t('Configuration', '配置')}>
         <div class="settings-list">
           <div class="setting-row">
             <span>{t('Language', '语言')}</span>
-            <span class="setting-value">{language === 'zh' ? '中文' : 'English'}</span>
+            <span class="mono">{language === 'zh' ? '中文' : 'English'}</span>
           </div>
           <div class="setting-row">
             <span>{t('Readonly Mode', '只读模式')}</span>
-            <span class="setting-value badge-info">{t('Enabled', '已启用')}</span>
+            <span class="badge-ok">{t('Enabled', '已启用')}</span>
           </div>
           <div class="setting-row">
             <span>{t('Gateway', '网关连接')}</span>
-            <span class="setting-value badge-ok">Connected</span>
+            <span class="badge-ok">Connected</span>
           </div>
           <div class="setting-row">
             <span>{t('Port', '端口')}</span>
-            <span class="setting-value">4330</span>
+            <span class="mono">4330</span>
           </div>
           <div class="setting-row">
             <span>{t('Frontend', '前端框架')}</span>
-            <span class="setting-value">Svelte 5 + Vite</span>
+            <span class="mono">Svelte 5 + Vite</span>
           </div>
           <div class="setting-row">
             <span>{t('Bundle Size (gzip)', '包大小 (gzip)')}</span>
-            <span class="setting-value">~25 KB</span>
+            <span class="mono">~34 KB</span>
           </div>
         </div>
       </Card>
       <SecurityStatus {language} {loading} />
       <UpdateStatus {language} {loading} />
     </div>
-
-  {:else}
-    <Card title={t('Not Found', '页面不存在')}>
-      <div class="empty-state">{t('This section is not yet implemented.', '此页面尚未实现。')}</div>
-    </Card>
   {/if}
 </div>
 
@@ -138,33 +127,14 @@
 
   .dashboard-grid {
     display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--space-lg);
   }
 
-  .overview-grid {
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  }
-
-  .team-grid {
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  }
-
-  .tasks-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .collab-grid,
-  .memory-grid,
-  .docs-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .usage-grid {
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  }
-
-  .settings-grid {
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  @media (max-width: 900px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .full-width {
@@ -177,13 +147,6 @@
     padding: var(--space-md) var(--space-lg);
     border-radius: var(--radius-md);
     margin-bottom: var(--space-lg);
-    font-size: var(--font-size-sm);
-  }
-
-  .empty-state {
-    color: var(--text-muted);
-    text-align: center;
-    padding: var(--space-xl) 0;
     font-size: var(--font-size-sm);
   }
 
@@ -206,9 +169,10 @@
     border-bottom: none;
   }
 
-  .setting-value {
+  .mono {
     color: var(--text-secondary);
     font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
   }
 
   .badge-ok {
@@ -217,13 +181,6 @@
     padding: 2px 8px;
     border-radius: var(--radius-full);
     font-size: var(--font-size-xs);
-  }
-
-  .badge-info {
-    background: var(--info-soft);
-    color: var(--info);
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
+    font-weight: 600;
   }
 </style>

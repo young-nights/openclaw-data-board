@@ -1,22 +1,23 @@
-<!-- App.svelte - Root Component -->
+<!-- App.svelte - Root Component with Theme Support -->
 <script lang="ts">
   import Header from './components/Header.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import Dashboard from './components/Dashboard.svelte';
   import { api } from './stores/api';
   import { SSEManager } from './stores/sse';
+  import { applyTheme, loadTheme, type Theme } from './stores/theme';
   import type { UiPreferences, UiLanguage, BrainTimelineItem } from './types';
 
   let language = $state<UiLanguage>('zh');
   let activeSection = $state<string>('overview');
   let compactMode = $state(false);
+  let currentTheme = $state<Theme>('dark');
   let brainTimeline = $state<BrainTimelineItem[]>([]);
-  let loading = $state(true);
+  let loading = $state(false);
   let error = $state<string | null>(null);
 
   const sse = new SSEManager();
 
-  // Load initial preferences
   async function loadPreferences() {
     try {
       const prefs = await api.getUiPreferences() as { preferences: UiPreferences };
@@ -27,7 +28,6 @@
     }
   }
 
-  // Load initial timeline data
   async function loadTimeline() {
     try {
       loading = true;
@@ -40,7 +40,6 @@
     }
   }
 
-  // Connect SSE for real-time updates
   function connectSSE() {
     sse.connect('/api/brain/stream');
     sse.on('timeline', (data) => {
@@ -53,20 +52,31 @@
 
   // Initialize
   $effect(() => {
+    currentTheme = loadTheme();
+    applyTheme(currentTheme);
     loadPreferences();
     loadTimeline();
     connectSSE();
     return () => sse.close();
   });
 
-  // Handle section navigation
   function handleNavigate(section: string) {
     activeSection = section;
+  }
+
+  function handleThemeChange(theme: Theme) {
+    currentTheme = theme;
+    applyTheme(theme);
   }
 </script>
 
 <div class="app" class:compact={compactMode}>
-  <Header {language} onLangChange={(lang) => language = lang} />
+  <Header
+    {language}
+    theme={currentTheme}
+    onLangChange={(lang) => language = lang}
+    onThemeChange={handleThemeChange}
+  />
   <div class="app-body">
     <Sidebar {activeSection} {language} onNavigate={handleNavigate} />
     <main class="main-content">

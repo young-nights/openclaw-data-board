@@ -1,3 +1,6 @@
+// @deprecated Phase 2: Remove old HTML rendering logic (lines 930-2160+), keep only API endpoints + static file serving.
+// New frontend: frontend/src/ (Svelte 5 + Vite) builds to dist/
+// API routes preserved below, HTML string templates are dead code.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";

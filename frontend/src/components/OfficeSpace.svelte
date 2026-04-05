@@ -1,7 +1,8 @@
-<!-- OfficeSpace.svelte - Office Space Visualization -->
+<!-- OfficeSpace.svelte - Office Space Visualization with Avatar Customization -->
 <script lang="ts">
   import Card from './common/Card.svelte';
   import Badge from './common/Badge.svelte';
+  import AvatarSelector from './common/AvatarSelector.svelte';
   import type { UiLanguage, AgentRunState } from '../types';
 
   let { language, loading = false }: {
@@ -13,13 +14,14 @@
     return language === 'zh' ? zh : en;
   }
 
-  const agents = [
-    { id: 'main', name: '龙虾主管', animal: '🦞', accent: '#ff9966', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
-    { id: 'coder', name: '设计师', animal: '🐒', accent: '#f0a030', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
-    { id: 'secretary', name: '秘书', animal: '🦊', accent: '#ffb36e', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
-    { id: 'analyst', name: '产品分析员', animal: '🦉', accent: '#f4ccff', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
-    { id: 'evaluator', name: '评估员', animal: '🐻', accent: '#a4ffb0', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
-  ];
+  // Agent data with customizable avatars
+  let agents = $state([
+    { id: 'main', name: '龙虾主管', avatar: '🦞', accent: '#ff9966', status: 'idle' as AgentRunState, sessions: 2, tasks: 0 },
+    { id: 'coder', name: '设计师', avatar: '🐒', accent: '#f0a030', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
+    { id: 'secretary', name: '秘书', avatar: '🦊', accent: '#ffb36e', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
+    { id: 'analyst', name: '产品分析员', avatar: '🦉', accent: '#f4ccff', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
+    { id: 'evaluator', name: '评估员', avatar: '🐻', accent: '#a4ffb0', status: 'idle' as AgentRunState, sessions: 0, tasks: 0 },
+  ]);
 
   function getStatusLabel(state: AgentRunState): string {
     const labels: Record<string, { en: string; zh: string }> = {
@@ -39,19 +41,28 @@
     if (state === 'waiting_approval') return 'warn';
     return 'blocked';
   }
+
+  function handleAvatarChange(agentId: string, newAvatar: string) {
+    const agent = agents.find(a => a.id === agentId);
+    if (agent) {
+      agent.avatar = newAvatar;
+    }
+  }
 </script>
 
 <Card
   title={t('Office Space', '办公室')}
-  subtitle={t('Team status at a glance', '团队状态一览')}
+  subtitle={t('Team status at a glance · Click avatar to customize', '团队状态一览 · 点击头像可自定义')}
   {loading}
 >
   <div class="office-grid">
-    {#each agents as agent}
-      <div class="agent-card" style:border-color={agent.accent}33>
-        <div class="agent-avatar" style:background={agent.accent}22>
-          <span class="avatar-emoji">{agent.animal}</span>
-        </div>
+    {#each agents as agent (agent.id)}
+      <div class="agent-card" style:border-color={agent.accent + '33'}>
+        <AvatarSelector
+          currentAvatar={agent.avatar}
+          agentId={agent.id}
+          onSelect={(emoji) => handleAvatarChange(agent.id, emoji)}
+        />
         <div class="agent-info">
           <strong>{agent.name}</strong>
           <div class="agent-meta">
@@ -71,7 +82,7 @@
 <style>
   .office-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: var(--space-md);
   }
 
@@ -89,20 +100,7 @@
   .agent-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
-  }
-
-  .agent-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .avatar-emoji {
-    font-size: 1.5rem;
+    border-color: var(--border-active);
   }
 
   .agent-info {

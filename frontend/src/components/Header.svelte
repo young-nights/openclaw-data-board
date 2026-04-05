@@ -1,13 +1,17 @@
-<!-- Header.svelte - Top Navigation Bar -->
+<!-- Header.svelte - Top Navigation Bar with Theme Toggle -->
 <script lang="ts">
   import type { UiLanguage } from '../types';
+  import type { Theme } from '../stores/theme';
 
-  let { language, onLangChange }: {
+  let { language, theme, onLangChange, onThemeChange }: {
     language: UiLanguage;
+    theme: Theme;
     onLangChange: (lang: UiLanguage) => void;
+    onThemeChange: (theme: Theme) => void;
   } = $props();
 
   let time = $state(new Date());
+  let showThemeMenu = $state(false);
 
   $effect(() => {
     const timer = setInterval(() => time = new Date(), 1000);
@@ -20,6 +24,17 @@
 
   function toggleLanguage() {
     onLangChange(language === 'en' ? 'zh' : 'en');
+  }
+
+  const themeOptions: { key: Theme; icon: string; label: string }[] = [
+    { key: 'dark', icon: '🌙', label: '深色' },
+    { key: 'light', icon: '☀️', label: '浅色' },
+    { key: 'midnight', icon: '🌌', label: '午夜' },
+  ];
+
+  function selectTheme(t: Theme) {
+    onThemeChange(t);
+    showThemeMenu = false;
   }
 </script>
 
@@ -43,6 +58,28 @@
   </div>
 
   <div class="header-right">
+    <!-- Theme Toggle -->
+    <div class="theme-switcher">
+      <button class="btn-icon" onclick={() => showThemeMenu = !showThemeMenu} title="切换主题">
+        {themeOptions.find(t => t.key === theme)?.icon ?? '🌙'}
+      </button>
+      {#if showThemeMenu}
+        <div class="theme-dropdown">
+          {#each themeOptions as opt}
+            <button
+              class="theme-option"
+              class:active={theme === opt.key}
+              onclick={() => selectTheme(opt.key)}
+            >
+              <span>{opt.icon}</span>
+              <span>{opt.label}</span>
+            </button>
+          {/each}
+        </div>
+        <div class="overlay" onclick={() => showThemeMenu = false}></div>
+      {/if}
+    </div>
+
     <button class="btn-icon" onclick={toggleLanguage} title="Switch language">
       {language === 'zh' ? 'EN' : '中'}
     </button>
@@ -90,6 +127,7 @@
     background: linear-gradient(135deg, var(--accent), #a78bfa);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .badge {
@@ -159,6 +197,7 @@
     font-size: var(--font-size-sm);
     font-weight: 600;
     transition: all var(--transition-fast);
+    text-decoration: none;
   }
 
   .btn-icon:hover {
@@ -170,5 +209,65 @@
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     color: var(--text-muted);
+  }
+
+  .theme-switcher {
+    position: relative;
+  }
+
+  .theme-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-xs);
+    z-index: var(--z-modal);
+    min-width: 120px;
+    box-shadow: var(--shadow-lg);
+    animation: slideDown 150ms ease-out;
+  }
+
+  .theme-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: all var(--transition-fast);
+  }
+
+  .theme-option:hover {
+    background: var(--bg-input);
+    color: var(--text-primary);
+  }
+
+  .theme-option.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-modal) - 1);
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>
