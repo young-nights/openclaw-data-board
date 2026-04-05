@@ -124,7 +124,7 @@
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
     tooltipX = rect.left + rect.width / 2;
-    tooltipY = rect.top;
+    tooltipY = rect.top + rect.height / 2;
   }
 
   function moveTooltip(e: MouseEvent) {
@@ -132,7 +132,7 @@
       const target = e.currentTarget as HTMLElement;
       const rect = target.getBoundingClientRect();
       tooltipX = rect.left + rect.width / 2;
-      tooltipY = rect.top;
+      tooltipY = rect.top + rect.height / 2;
     }
   }
 
@@ -219,6 +219,7 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="bar-cell"
+              class:active={tooltipDay === i}
               onmouseenter={(e) => showTooltip(e, i)}
               onmouseleave={hideTooltip}
             >
@@ -234,7 +235,7 @@
 
         <!-- Tooltip -->
         {#if tooltipDay !== null}
-          <div class="tooltip" style="left: {tooltipX}px; top: {tooltipY}px" bind:this={tooltipEl}>
+          <div class="tooltip" style="--tooltip-x: {tooltipX}px; --tooltip-y: {tooltipY}px" bind:this={tooltipEl}>
             <div class="tooltip-date">{dayLabels[tooltipDay]}</div>
             <div class="tooltip-body">
               {#each currentModels as model}
@@ -369,7 +370,7 @@
   .chart-container {
     display: flex;
     gap: 0;
-    height: 320px;
+    height: 420px;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
     background: #fafafa;
@@ -435,11 +436,12 @@
     filter: brightness(1.1);
   }
 
-  .bar-cell:hover::after {
+  .bar-cell.active::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.04);
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
   }
 
   .bar-stack {
@@ -462,11 +464,12 @@
     border-radius: 4px 4px 0 0;
   }
 
-  /* Tooltip - attached to bar */
+  /* Tooltip - beside bar */
   .tooltip {
     position: fixed;
-    transform: translate(-50%, -100%);
-    margin-top: -16px;
+    left: calc(var(--tooltip-x) + 12px);
+    top: var(--tooltip-y);
+    transform: translateY(-50%);
     z-index: 100;
     pointer-events: none;
     min-width: 180px;
