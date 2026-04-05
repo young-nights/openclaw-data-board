@@ -140,8 +140,8 @@
     tooltipDay = idx;
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
-    tooltipX = rect.right + 8;
-    tooltipY = rect.top + rect.height / 2;
+    tooltipX = rect.left + rect.width / 2;
+    tooltipY = rect.top;
   }
 
   function moveTooltip(e: MouseEvent) {
@@ -476,12 +476,13 @@
     border-radius: 4px 4px 0 0;
   }
 
-  /* Tooltip - to the right of bar */
+  /* Tooltip - above bar, centered on X-axis */
   .tooltip {
     position: fixed;
     left: var(--tooltip-x);
     top: var(--tooltip-y);
-    transform: translateY(-50%);
+    transform: translate(-50%, -100%);
+    margin-top: -16px;
     z-index: 100;
     pointer-events: none;
     min-width: 170px;
@@ -489,6 +490,21 @@
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #e5e7eb;
+  }
+
+  /* Dot indicator connecting to bar */
+  .tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    background: #1f2937;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   }
 
   .tooltip-date {
