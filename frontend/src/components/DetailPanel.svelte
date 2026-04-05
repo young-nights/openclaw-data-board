@@ -21,7 +21,13 @@
     tooltipDay = idx;
     const r = el.getBoundingClientRect();
     tooltipX = r.left + r.width / 2;
-    tooltipY = r.top;
+    tooltipY = r.top + r.height / 2;
+  }
+
+  function onMouseMove(e: MouseEvent) {
+    if (tooltipDay !== null) {
+      tooltipY = e.clientY;
+    }
   }
 
   function hideAll() {
@@ -182,6 +188,7 @@
               class="bar-cell"
               class:active={hoveredBarIdx === i}
               onmouseenter={(e) => { hoveredBarIdx = i; showTooltip(i, e.currentTarget); }}
+              onmousemove={onMouseMove}
               onmouseleave={() => hideAll()}
             >
               <div class="bar-stack" style="height: {Math.min(pct, 100)}%">
