@@ -11,11 +11,17 @@
   }
 
   let timeRange = $state<'1h' | '1d' | '7d' | '1m' | '1y'>('7d');
-  let groupBy = $state<'model' | 'key' | 'provider'>('model');
   let detailView = $state<'spend' | 'requests' | 'tokens' | null>(null);
   let lastUpdated = $state(new Date());
   let showTimeMenu = $state(false);
   let showFilterMenu = $state(false);
+
+  // Filter state
+  let expandedSection = $state<'models' | 'keys' | null>(null);
+  let modelSearch = $state('');
+  let keySearch = $state('');
+  let selectedModels = $state<Set<string>>(new Set(['MiMo-V2-Pro', 'DeepSeek V3', 'MiMo-V2-Omni']));
+  let selectedKeys = $state<Set<string>>(new Set(['All API Keys']));
 
   const timeRanges = [
     { key: '1h' as const, label: '1 Hour' },
@@ -25,18 +31,25 @@
     { key: '1y' as const, label: '1 Year' },
   ];
 
-  const groupOptions = [
-    { key: 'model' as const, label: t('By Model', '按模型') },
-    { key: 'key' as const, label: t('By API Key', '按 API Key') },
-    { key: 'provider' as const, label: t('By Provider', '按供应商') },
+  // Dynamic model data
+  const allModels = [
+    { name: 'MiMo-V2-Pro', color: '#f5a623', spend: 0.0679, requests: 6030, tokens: 608000000 },
+    { name: 'DeepSeek V3', color: '#3ecf8e', spend: 0.00552, requests: 2, tokens: 11000 },
+    { name: 'MiMo-V2-Omni', color: '#7c9aff', spend: 0, requests: 507, tokens: 25200000 },
   ];
 
-  // Filter state
-  let selectedModels = $state<Set<string>>(new Set(['MiMo-V2-Pro', 'DeepSeek V3', 'MiMo-V2-Omni']));
-  let selectedKeys = $state<Set<string>>(new Set(['All API Keys']));
+  const allKeys = [
+    { name: 'openclaw-desktop', key: 'sk-...a1b2', requests: 4520 },
+    { name: 'openclaw-server', key: 'sk-...c3d4', requests: 2017 },
+  ];
 
-  const availableModels = ['MiMo-V2-Pro', 'DeepSeek V3', 'MiMo-V2-Omni', 'Qwen3-235B'];
-  const availableKeys = ['All API Keys', 'sk-...a1b2', 'sk-...c3d4'];
+  const filteredModels = $derived(
+    allModels.filter(m => m.name.toLowerCase().includes(modelSearch.toLowerCase()))
+  );
+
+  const filteredKeys = $derived(
+    allKeys.filter(k => k.name.toLowerCase().includes(keySearch.toLowerCase()) || k.key.toLowerCase().includes(keySearch.toLowerCase()))
+  );
 
   function toggleModel(m: string) {
     const s = new Set(selectedModels);
@@ -56,22 +69,10 @@
     }
   }
 
-  function clearFilters() {
-    selectedModels = new Set(availableModels);
-    selectedKeys = new Set(['All API Keys']);
-  }
-
   const activeFilterCount = $derived(
-    (selectedModels.size < availableModels.length ? 1 : 0) +
+    (selectedModels.size < allModels.length ? 1 : 0) +
     (!selectedKeys.has('All API Keys') ? 1 : 0)
   );
-
-  // Dynamic model data
-  const allModels = [
-    { name: 'MiMo-V2-Pro', color: '#f5a623', spend: 0.0679, requests: 6030, tokens: 608000000 },
-    { name: 'DeepSeek V3', color: '#3ecf8e', spend: 0.00552, requests: 2, tokens: 11000 },
-    { name: 'MiMo-V2-Omni', color: '#7c9aff', spend: 0, requests: 507, tokens: 25200000 },
-  ];
 
   function formatNum(n: number): string {
     if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -84,8 +85,6 @@
   const requestsModels = $derived(allModels.filter(m => m.requests > 0 && selectedModels.has(m.name)).map(m => ({ name: m.name, value: formatNum(m.requests), color: m.color })));
   const tokensModels = $derived(allModels.filter(m => m.tokens > 0 && selectedModels.has(m.name)).map(m => ({ name: m.name, value: formatNum(m.tokens), color: m.color })));
 
-  // Mini chart data - adapts to time range
-  // 1h: 12 points (5min intervals), 1d: 24 points (hourly), 7d: 7 points (daily), 1m: 30 points (daily), 1y: 12 points (monthly)
   function genMiniData(spike: number, spikeIdx: number, points: number): number[] {
     return Array.from({ length: points }, (_, i) => {
       const dist = Math.abs(i - spikeIdx);
@@ -101,37 +100,15 @@
     if (range === '1d') return 24;
     if (range === '7d') return 7;
     if (range === '1m') return 30;
-    return 12; // 1y
+    return 12;
   }
 
   const pointCount = $derived(getPointCount(timeRange));
-  const hasData = $derived(timeRange !== '1h'); // 1h = no data for demo
+  const hasData = $derived(timeRange !== '1h');
 
   const spendChartData = $derived(hasData ? genMiniData(8, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
   const requestsChartData = $derived(hasData ? genMiniData(350, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
   const tokensChartData = $derived(hasData ? genMiniData(65000, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
-
-  // X-axis labels based on time range
-  function getXLabels(range: string): string[] {
-    if (range === '1h') return Array.from({ length: 12 }, (_, i) => `${i * 5}m`);
-    if (range === '1d') return Array.from({ length: 24 }, (_, i) => `${i}:00`);
-    if (range === '7d') {
-      return Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(2026, 3, 1 + i);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      });
-    }
-    if (range === '1m') {
-      return Array.from({ length: 30 }, (_, i) => {
-        const d = new Date(2026, 2, 6 + i);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      });
-    }
-    // 1y
-    return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  }
-
-  const xLabels = $derived(getXLabels(timeRange));
 
   function handleRefresh() { lastUpdated = new Date(); }
   function formatTime(date: Date): string {
@@ -153,17 +130,9 @@
 <svelte:window onclick={closeMenus} />
 
 <div class="activity-page">
-  <!-- Top Bar -->
   <div class="page-header">
     <h2 class="page-title">Activity</h2>
     <div class="header-controls">
-      <!-- Group By -->
-      <select class="select-control" bind:value={groupBy}>
-        {#each groupOptions as opt}
-          <option value={opt.key}>{opt.label}</option>
-        {/each}
-      </select>
-
       <!-- Time Range Dropdown -->
       <div class="dropdown-wrap time-dropdown">
         <button class="dropdown-trigger" onclick={() => { showTimeMenu = !showTimeMenu; showFilterMenu = false; }}>
@@ -173,11 +142,7 @@
         {#if showTimeMenu}
           <div class="dropdown-menu fade-in">
             {#each timeRanges as tr}
-              <button
-                class="dropdown-item"
-                class:active={timeRange === tr.key}
-                onclick={() => { timeRange = tr.key; showTimeMenu = false; }}
-              >
+              <button class="dropdown-item" class:active={timeRange === tr.key} onclick={() => { timeRange = tr.key; showTimeMenu = false; }}>
                 {tr.label}
               </button>
             {/each}
@@ -185,9 +150,9 @@
         {/if}
       </div>
 
-      <!-- Filter Dropdown -->
+      <!-- Filter Dropdown - Accordion Style -->
       <div class="dropdown-wrap filter-dropdown">
-        <button class="dropdown-trigger filter-trigger" onclick={() => { showFilterMenu = !showFilterMenu; showTimeMenu = false; }}>
+        <button class="dropdown-trigger filter-trigger" onclick={() => { showFilterMenu = !showFilterMenu; showTimeMenu = false; expandedSection = null; }}>
           <span class="filter-icon">🔍</span>
           {t('Filters', '筛选')}
           {#if activeFilterCount > 0}
@@ -196,30 +161,54 @@
           <span class="chevron" class:open={showFilterMenu}>▾</span>
         </button>
         {#if showFilterMenu}
-          <div class="dropdown-menu filter-menu fade-in">
+          <div class="dropdown-menu accordion-menu fade-in">
             <!-- Models Section -->
-            <div class="filter-section">
-              <div class="filter-section-title">{t('Models', '模型')}</div>
-              {#each availableModels as model}
-                <label class="filter-option">
-                  <input type="checkbox" checked={selectedModels.has(model)} onchange={() => toggleModel(model)} />
-                  <span>{model}</span>
-                </label>
-              {/each}
+            <div class="accordion-section">
+              <button class="accordion-header" onclick={() => expandedSection = expandedSection === 'models' ? null : 'models'}>
+                <span>{t('Models', '模型')}</span>
+                <span class="chevron" class:open={expandedSection === 'models'}>▸</span>
+              </button>
+              {#if expandedSection === 'models'}
+                <div class="accordion-body fade-in">
+                  <input type="text" class="search-input" placeholder={t('Search models', '搜索模型')} bind:value={modelSearch} />
+                  <div class="filter-list">
+                    {#each filteredModels as model}
+                      <label class="filter-option">
+                        <input type="checkbox" checked={selectedModels.has(model.name)} onchange={() => toggleModel(model.name)} />
+                        <span class="model-color-dot" style="background: {model.color}"></span>
+                        <span>{model.name}</span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
             </div>
 
             <!-- API Keys Section -->
-            <div class="filter-section">
-              <div class="filter-section-title">API Keys</div>
-              {#each availableKeys as key}
-                <label class="filter-option">
-                  <input type="radio" name="apikey" checked={selectedKeys.has(key)} onchange={() => toggleKey(key)} />
-                  <span>{key}</span>
-                </label>
-              {/each}
+            <div class="accordion-section">
+              <button class="accordion-header" onclick={() => expandedSection = expandedSection === 'keys' ? null : 'keys'}>
+                <span>API Keys</span>
+                <span class="chevron" class:open={expandedSection === 'keys'}>▸</span>
+              </button>
+              {#if expandedSection === 'keys'}
+                <div class="accordion-body fade-in">
+                  <input type="text" class="search-input" placeholder={t('Search API keys', '搜索 API Key')} bind:value={keySearch} />
+                  <div class="filter-list">
+                    <label class="filter-option">
+                      <input type="radio" name="apikey" checked={selectedKeys.has('All API Keys')} onchange={() => toggleKey('All API Keys')} />
+                      <span>{t('All API Keys', '全部 API Key')}</span>
+                    </label>
+                    {#each filteredKeys as key}
+                      <label class="filter-option">
+                        <input type="radio" name="apikey" checked={selectedKeys.has(key.key)} onchange={() => toggleKey(key.key)} />
+                        <span class="key-icon">🔑</span>
+                        <span>{key.name} <span class="key-value">{key.key}</span></span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
             </div>
-
-            <button class="clear-btn" onclick={clearFilters}>{t('Clear All', '清除全部')}</button>
           </div>
         {/if}
       </div>
@@ -236,7 +225,6 @@
       chartData={tokensChartData} modelBreakdown={tokensModels} onClick={() => openDetail('tokens')} />
   </div>
 
-  <!-- Detail Overlay -->
   {#if detailView}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="detail-overlay" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('detail-overlay')) detailView = null; }}>
@@ -244,7 +232,6 @@
     </div>
   {/if}
 
-  <!-- Footer -->
   <div class="page-footer">
     <span class="footer-note">{t('Logs have moved', '日志已迁移')} <a href="#logs">{t('Your API request logs now have their own dedicated page.', 'API 请求日志已有专属页面。')}</a></span>
     <div class="footer-actions">
@@ -258,254 +245,134 @@
   .activity-page { max-width: 1400px; margin: 0 auto; width: 100%; }
 
   .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    gap: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
   }
 
-  .page-title {
-    font-size: 24px;
-    font-weight: 600;
-    margin: 0;
-    color: #111827;
-    letter-spacing: -0.01em;
-  }
+  .page-title { font-size: 24px; font-weight: 600; margin: 0; color: #111827; letter-spacing: -0.01em; }
 
-  .header-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .select-control {
-    padding: 7px 14px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
-    color: #374151;
-    font-size: 13px;
-    border-radius: 10px;
-    cursor: pointer;
-    outline: none;
-  }
+  .header-controls { display: flex; align-items: center; gap: 10px; }
 
   /* Dropdown */
-  .dropdown-wrap {
-    position: relative;
-  }
+  .dropdown-wrap { position: relative; }
 
   .dropdown-trigger {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 14px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
-    color: #374151;
-    font-size: 13px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 120ms;
-    white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border: 1px solid #e5e7eb; background: #ffffff;
+    color: #374151; font-size: 13px; border-radius: 10px;
+    cursor: pointer; transition: all 120ms; white-space: nowrap;
   }
 
-  .dropdown-trigger:hover {
-    border-color: #d1d5db;
-    background: #f9fafb;
-  }
+  .dropdown-trigger:hover { border-color: #d1d5db; background: #f9fafb; }
 
-  .filter-trigger {
-    gap: 8px;
-  }
-
-  .filter-icon {
-    font-size: 12px;
-  }
+  .filter-trigger { gap: 8px; }
+  .filter-icon { font-size: 12px; }
 
   .filter-badge {
-    background: #3b82f6;
-    color: white;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 10px;
-    min-width: 18px;
-    text-align: center;
+    background: #3b82f6; color: white; font-size: 11px; font-weight: 600;
+    padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center;
   }
 
-  .chevron {
-    font-size: 11px;
-    color: #9ca3af;
-    transition: transform 200ms;
-    display: inline-block;
-  }
+  .chevron { font-size: 11px; color: #9ca3af; transition: transform 200ms; display: inline-block; }
+  .chevron.open { transform: rotate(180deg); }
 
-  .chevron.open {
-    transform: rotate(180deg);
-  }
-
-  /* Dropdown Menu - fade in/out */
+  /* Dropdown Menu */
   .dropdown-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 6px;
-    min-width: 160px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    z-index: 100;
+    position: absolute; top: calc(100% + 6px); right: 0;
+    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); z-index: 100;
   }
 
-  .filter-menu {
-    min-width: 240px;
-    padding: 12px;
-  }
+  .accordion-menu { padding: 8px; min-width: 280px; }
 
   .dropdown-item {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 8px 12px;
-    border: none;
-    background: transparent;
-    color: #374151;
-    font-size: 13px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 120ms;
+    display: block; width: 100%; text-align: left;
+    padding: 8px 12px; border: none; background: transparent;
+    color: #374151; font-size: 13px; border-radius: 8px;
+    cursor: pointer; transition: background 120ms;
   }
 
-  .dropdown-item:hover {
-    background: #f3f4f6;
+  .dropdown-item:hover { background: #f3f4f6; }
+  .dropdown-item.active { background: #eff6ff; color: #2563eb; font-weight: 500; }
+
+  /* Accordion */
+  .accordion-section {
+    border-bottom: 1px solid #f3f4f6;
   }
 
-  .dropdown-item.active {
-    background: #eff6ff;
-    color: #2563eb;
-    font-weight: 500;
+  .accordion-section:last-child { border-bottom: none; }
+
+  .accordion-header {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 10px 8px; border: none; background: transparent;
+    color: #111827; font-size: 14px; font-weight: 600;
+    cursor: pointer; border-radius: 8px; transition: background 120ms;
   }
 
-  /* Filter sections */
-  .filter-section {
-    margin-bottom: 16px;
+  .accordion-header:hover { background: #f9fafb; }
+
+  .accordion-header .chevron { transform: rotate(0deg); transition: transform 200ms; }
+  .accordion-header .chevron.open { transform: rotate(90deg); }
+
+  .accordion-body { padding: 4px 8px 12px; }
+
+  .search-input {
+    width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb;
+    border-radius: 8px; font-size: 13px; color: #374151;
+    outline: none; margin-bottom: 8px; box-sizing: border-box;
   }
 
-  .filter-section:last-of-type {
-    margin-bottom: 12px;
-  }
+  .search-input:focus { border-color: #3b82f6; }
 
-  .filter-section-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #111827;
-    margin-bottom: 8px;
-  }
+  .filter-list { display: flex; flex-direction: column; gap: 2px; max-height: 200px; overflow-y: auto; }
 
   .filter-option {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 4px;
-    font-size: 13px;
-    color: #374151;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: background 120ms;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 4px; font-size: 13px; color: #374151;
+    cursor: pointer; border-radius: 6px; transition: background 120ms;
   }
 
-  .filter-option:hover {
-    background: #f3f4f6;
-  }
+  .filter-option:hover { background: #f3f4f6; }
+  .filter-option input { accent-color: #3b82f6; width: 15px; height: 15px; }
 
-  .filter-option input {
-    accent-color: #3b82f6;
-    width: 15px;
-    height: 15px;
-  }
+  .model-color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .key-icon { font-size: 12px; }
+  .key-value { color: #9ca3af; font-family: 'SF Mono', monospace; font-size: 11px; }
 
-  .clear-btn {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
-    color: #374151;
-    font-size: 13px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 120ms;
-  }
-
-  .clear-btn:hover {
-    background: #f3f4f6;
-    border-color: #d1d5db;
-  }
-
-  /* Fade animation */
-  .fade-in {
-    animation: fadeIn 150ms ease-out;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  /* Fade */
+  .fade-in { animation: fadeIn 150ms ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
   /* Metrics Row */
   .metrics-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    margin-bottom: 28px;
-    max-width: 1400px;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 24px; margin-bottom: 28px; max-width: 1400px;
   }
 
-  @media (max-width: 900px) {
-    .metrics-row { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 900px) { .metrics-row { grid-template-columns: 1fr; } }
 
   /* Detail Overlay */
   .detail-overlay {
-    position: fixed;
-    inset: 0;
-    background: #ffffff;
-    z-index: 100;
-    overflow-y: auto;
-    padding: 40px;
-    animation: fadeIn 200ms ease-out;
+    position: fixed; inset: 0; background: #ffffff; z-index: 100;
+    overflow-y: auto; padding: 40px; animation: fadeIn 200ms ease-out;
   }
 
   /* Footer */
   .page-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 20px; flex-wrap: wrap; gap: 12px;
   }
 
   .footer-note { font-size: 13px; color: #9ca3af; }
   .footer-link { color: #6b7280; text-decoration: underline; margin-left: 4px; }
-
   .footer-actions { display: flex; align-items: center; gap: 12px; }
   .last-updated { font-size: 12px; color: #9ca3af; font-family: 'SF Mono', monospace; }
 
   .refresh-btn {
-    width: 32px;
-    height: 32px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
-    color: #6b7280;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 32px; height: 32px; border: 1px solid #e5e7eb;
+    background: #ffffff; color: #6b7280; border-radius: 8px;
+    cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
   }
 
   .refresh-btn:hover { border-color: #d1d5db; color: #111827; }
