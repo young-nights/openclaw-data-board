@@ -20,7 +20,7 @@
   function showTooltip(idx: number, el: HTMLElement) {
     tooltipDay = idx;
     const r = el.getBoundingClientRect();
-    tooltipX = r.right;
+    tooltipX = r.left + r.width / 2;
     tooltipY = r.top + r.height / 2;
   }
 
@@ -462,7 +462,7 @@
     position: fixed;
     left: 0;
     top: 0;
-    transform: translate(0, calc(var(--ty) - 100% - 8px));
+    transform: translate(-50%, calc(var(--ty) - 100% - 8px));
     z-index: 100;
     pointer-events: none;
     min-width: 220px;
