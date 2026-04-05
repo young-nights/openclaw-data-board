@@ -265,14 +265,15 @@
               {#each currentModels as model}
                 {#if model.data[tooltipDay] > 0}
                   <div class="tooltip-row" class:highlighted={hoveredModel === model.name}>
-                    <span class="tooltip-line" style="background: {model.color}"></span>
+                    <span class="tooltip-swatch" style="background: {model.color}"></span>
                     <span class="tooltip-model-name">{model.name}</span>
-                    <strong class="tooltip-value">{formatVal(model.data[tooltipDay])}</strong>
+                    <span class="tooltip-value">{formatVal(model.data[tooltipDay])}</span>
                   </div>
                 {/if}
               {/each}
               <div class="tooltip-total">
-                Total <strong>{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</strong>
+                <span>Total</span>
+                <span class="tooltip-total-value">{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</span>
               </div>
             </div>
           </div>
@@ -503,55 +504,41 @@
     box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3);
   }
 
-  /* Tooltip - beside bar */
+  /* Tooltip - Recharts style */
   .tooltip {
     position: fixed;
     left: var(--tooltip-x);
     top: var(--tooltip-y);
-    transform: translate(0, -50%);
+    transform: translate(8px, -50%);
     z-index: 100;
     pointer-events: none;
-    min-width: 140px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
-    border-radius: 10px;
-    overflow: hidden;
+    min-width: 150px;
+    background: #ffffff;
     border: 1px solid #e5e7eb;
-  }
-
-  /* Arrow pointing to bar */
-  .tooltip::before {
-    content: '';
-    position: absolute;
-    left: -6px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 0;
-    height: 0;
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-right: 6px solid #1f2937;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
   }
 
   .tooltip-date {
-    background: #1f2937;
-    color: #ffffff;
+    background: #f9fafb;
+    color: #111827;
     font-size: 12px;
-    font-weight: 500;
-    padding: 5px 10px;
-    text-align: center;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f3f4f6;
   }
 
   .tooltip-body {
-    background: #ffffff;
-    padding: 10px 14px;
+    padding: 8px 12px;
   }
 
   .tooltip-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 12px;
-    padding: 3px 6px;
+    padding: 4px 0;
     border-radius: 4px;
     transition: background 150ms;
   }
@@ -560,17 +547,16 @@
     background: #f3f4f6;
   }
 
-  .tooltip-line {
-    width: 3px;
-    height: 14px;
+  .tooltip-swatch {
+    width: 10px;
+    height: 10px;
     border-radius: 2px;
     flex-shrink: 0;
   }
 
   .tooltip-model-name {
     flex: 1;
-    color: #374151;
-    font-weight: 500;
+    color: #6b7280;
   }
 
   .tooltip-value {
@@ -581,18 +567,20 @@
   }
 
   .tooltip-total {
+    display: flex;
+    justify-content: space-between;
     margin-top: 6px;
-    padding-top: 8px;
+    padding-top: 6px;
     border-top: 1px solid #e5e7eb;
     font-size: 12px;
-    color: #6b7280;
-    text-align: right;
+    color: #374151;
+    font-weight: 500;
   }
 
-  .tooltip-total strong {
+  .tooltip-total-value {
     color: #111827;
     font-family: 'SF Mono', monospace;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   /* X Axis */
