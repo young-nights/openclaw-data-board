@@ -212,15 +212,43 @@
                   <div class="agent-detail fade-in">
                     <div class="detail-section">
                       <div class="detail-title">{t('Daily Requests (Last 7 Days)', '每日请求数（近 7 天）')}</div>
-                      <div class="detail-chart">
-                        {#each agentTrends[row.agent] as val, i}
-                          <div class="detail-chart-col">
-                            <div class="detail-chart-bar-wrap">
-                              <div class="detail-chart-bar" style="height: {(val / Math.max(...agentTrends[row.agent])) * 100}%"></div>
-                            </div>
-                            <div class="detail-chart-label">{weekLabels[i]}</div>
-                          </div>
-                        {/each}
+                      <div class="line-chart-wrap">
+                        {@const maxVal = Math.max(...agentTrends[row.agent])}
+                        {@const points = agentTrends[row.agent].map((v, i) => {
+                          const x = 40 + (i / (agentTrends[row.agent].length - 1)) * 280;
+                          const y = 80 - (v / maxVal) * 60;
+                          return { x, y, v };
+                        })}
+                        <svg viewBox="0 0 360 100" class="line-chart-svg">
+                          <!-- Grid lines -->
+                          {#each [0, 25, 50, 75, 100] as pct}
+                            <line x1="30" y1={80 - pct * 0.6} x2="340" y2={80 - pct * 0.6} stroke="#f3f4f6" stroke-width="1" />
+                          {/each}
+                          <!-- Line -->
+                          <polyline
+                            fill="none"
+                            stroke="#3b82f6"
+                            stroke-width="2"
+                            stroke-linejoin="round"
+                            stroke-linecap="round"
+                            points={points.map(p => `${p.x},${p.y}`).join(' ')}
+                          />
+                          <!-- Area fill -->
+                          <polygon
+                            fill="rgba(59, 130, 246, 0.08)"
+                            points={`${points[0].x},80 ${points.map(p => `${p.x},${p.y}`).join(' ')} ${points[points.length-1].x},80`}
+                          />
+                          <!-- Points -->
+                          {#each points as p, i}
+                            <circle cx={p.x} cy={p.y} r="3" fill="#3b82f6" stroke="#ffffff" stroke-width="2" />
+                            <text x={p.x} y={p.y - 8} text-anchor="middle" font-size="9" fill="#374151" font-weight="600">{p.v}</text>
+                          {/each}
+                        </svg>
+                        <div class="line-chart-labels">
+                          {#each weekLabels as label}
+                            <span>{label}</span>
+                          {/each}
+                        </div>
                       </div>
                     </div>
                     <div class="detail-stats">
@@ -421,11 +449,9 @@
   .agent-detail { padding: 20px 24px; }
   .detail-section { margin-bottom: 16px; }
   .detail-title { font-size: 15px; font-weight: 700; color: #374151; margin-bottom: 12px; }
-  .detail-chart { display: flex; gap: 8px; height: 120px; align-items: flex-end; }
-  .detail-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .detail-chart-bar-wrap { width: 100%; height: 100px; display: flex; align-items: flex-end; justify-content: center; }
-  .detail-chart-bar { width: 36px; background: #3b82f6; border-radius: 6px 4px 0 0; transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1); }
-  .detail-chart-label { font-size: 12px; color: #9ca3af; font-weight: 500; }
+  .line-chart-wrap { margin-bottom: 16px; }
+  .line-chart-svg { width: 100%; height: 100px; }
+  .line-chart-labels { display: flex; justify-content: space-between; padding: 0 40px; font-size: 10px; color: #9ca3af; }
   .detail-stats { display: flex; gap: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; }
   .detail-stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-label { font-size: 13px; color: #9ca3af; font-weight: 500; }
