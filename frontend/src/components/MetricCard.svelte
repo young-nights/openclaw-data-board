@@ -110,7 +110,7 @@
     margin-bottom: 4px;
   }
 
-  .card-title { font-size: 13px; font-weight: 500; color: #6b7280; }
+  .card-title { font-size: 15px; font-weight: 600; color: #6b7280; }
 
   .expand-btn {
     background: none; border: none; color: #9ca3af; cursor: pointer;
@@ -120,14 +120,14 @@
   .expand-btn:hover { background: #f3f4f6; color: #374151; }
 
   .card-value {
-    font-size: 28px; font-weight: 700; color: #111827; line-height: 1.1;
-    margin-bottom: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    font-size: 36px; font-weight: 800; color: #111827; line-height: 1.1;
+    margin-bottom: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
     letter-spacing: -0.02em;
   }
 
   .mini-chart {
-    display: flex; align-items: flex-end; gap: 2px;
-    flex: 1; min-height: 100px; margin-bottom: 16px; padding: 0 2px;
+    display: flex; align-items: flex-end; gap: 3px;
+    flex: 1; min-height: 120px; margin-bottom: 16px; padding: 0 2px;
   }
 
   .mini-chart.no-data {
@@ -136,27 +136,28 @@
   }
 
   .mini-bar {
-    width: 5px; flex: 1; border-radius: 2px 2px 0 0;
+    width: 6px; flex: 1; border-radius: 3px 3px 0 0;
     transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms;
-    min-height: 1px;
+    min-height: 2px;
   }
 
   .no-data {
     text-align: center;
-    font-size: 12px;
+    font-size: 14px;
     color: #9ca3af;
     margin-bottom: 12px;
+    font-weight: 500;
   }
 
   .model-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
 
   .model-row {
-    display: flex; align-items: center; gap: 8px; font-size: 12px;
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
   }
 
   .model-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .model-name { color: #374151; flex: 1; }
-  .model-value { color: #6b7280; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; }
+  .model-name { color: #374151; flex: 1; font-weight: 500; }
+  .model-value { color: #6b7280; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; font-weight: 500; }
 
   .total-row { margin-top: 2px; padding-top: 5px; border-top: 1px solid #f3f4f6; }
   .total-row .model-name, .total-row .model-value { font-weight: 600; color: #111827; }

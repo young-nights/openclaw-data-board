@@ -253,7 +253,7 @@
     margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
   }
 
-  .page-title { font-size: 24px; font-weight: 600; margin: 0; color: #111827; letter-spacing: -0.01em; }
+  .page-title { font-size: 28px; font-weight: 700; margin: 0; color: #111827; letter-spacing: -0.01em; }
 
   .header-controls { display: flex; align-items: center; gap: 10px; }
 
@@ -263,7 +263,7 @@
   .dropdown-trigger {
     display: flex; align-items: center; gap: 6px;
     padding: 7px 14px; border: 1px solid #e5e7eb; background: #ffffff;
-    color: #374151; font-size: 13px; border-radius: 10px;
+    color: #374151; font-size: 14px; border-radius: 10px;
     cursor: pointer; transition: all 120ms; white-space: nowrap;
   }
 
