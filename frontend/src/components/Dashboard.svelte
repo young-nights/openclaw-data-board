@@ -1,4 +1,4 @@
-<!-- Dashboard.svelte - Main Dashboard Container (Final) -->
+<!-- Dashboard.svelte - Main Dashboard Container -->
 <script lang="ts">
   import Card from './common/Card.svelte';
   import GlobalVisibility from './GlobalVisibility.svelte';
@@ -16,6 +16,7 @@
   import ContextPressure from './ContextPressure.svelte';
   import SecurityStatus from './SecurityStatus.svelte';
   import UpdateStatus from './UpdateStatus.svelte';
+  import ActivityPage from './ActivityPage.svelte';
   import type { UiLanguage, BrainTimelineItem } from '../types';
 
   let { section, language, brainTimeline, loading, error, compactMode }: {
@@ -78,7 +79,7 @@
     <DocsSection {language} {loading} />
 
   {:else if section === 'usage-cost'}
-    <UsageCost {language} {loading} />
+    <ActivityPage {language} />
     <div class="dashboard-grid" style="margin-top: var(--space-lg)">
       <ContextPressure {language} {loading} />
     </div>
@@ -101,7 +102,7 @@
           </div>
           <div class="setting-row">
             <span>{t('Port', '端口')}</span>
-            <span class="mono">4330</span>
+            <span class="mono">4320</span>
           </div>
           <div class="setting-row">
             <span>{t('Frontend', '前端框架')}</span>
@@ -109,7 +110,7 @@
           </div>
           <div class="setting-row">
             <span>{t('Bundle Size (gzip)', '包大小 (gzip)')}</span>
-            <span class="mono">~34 KB</span>
+            <span class="mono">~37 KB</span>
           </div>
         </div>
       </Card>
