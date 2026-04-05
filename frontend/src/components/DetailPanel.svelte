@@ -141,10 +141,18 @@
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
     const target = e.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    // Center tooltip on the bar's X position
-    tooltipX = rect.left + rect.width / 2;
-    tooltipY = rect.top;
+    // Find the bar-stack inside this bar-cell
+    const barStack = target.querySelector('.bar-stack');
+    const stackRect = barStack?.getBoundingClientRect();
+    const cellRect = target.getBoundingClientRect();
+    if (stackRect) {
+      // Position at top-center of the stacked bar
+      tooltipX = stackRect.left + stackRect.width / 2;
+      tooltipY = stackRect.top;
+    } else {
+      tooltipX = cellRect.left + cellRect.width / 2;
+      tooltipY = cellRect.top;
+    }
   }
 
   function moveTooltip(e: MouseEvent) {
