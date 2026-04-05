@@ -19,22 +19,14 @@
 
   function showTooltip(idx: number, el: HTMLElement) {
     tooltipDay = idx;
-    const chartArea = el.closest('.chart-area') as HTMLElement;
-    if (chartArea) {
-      const cr = chartArea.getBoundingClientRect();
-      const br = el.getBoundingClientRect();
-      tooltipX = br.left - cr.left + br.width;
-      tooltipY = br.top - cr.top;
-    }
+    const br = el.getBoundingClientRect();
+    tooltipX = Math.max(10, Math.min(br.left + br.width, window.innerWidth - 240));
+    tooltipY = br.top;
   }
 
   function onMouseMove(e: MouseEvent) {
     if (tooltipDay !== null) {
-      const chartArea = (e.currentTarget as HTMLElement).closest('.chart-area') as HTMLElement;
-      if (chartArea) {
-        const cr = chartArea.getBoundingClientRect();
-        tooltipY = e.clientY - cr.top;
-      }
+      tooltipY = e.clientY;
     }
   }
 
@@ -469,12 +461,12 @@
 
   /* Tooltip */
   .tooltip {
-    position: absolute;
+    position: fixed;
     left: var(--tx);
     top: var(--ty);
     transform: translateY(-100%);
     margin-top: -8px;
-    z-index: 100;
+    z-index: 9999;
     pointer-events: none;
     min-width: 220px;
     background: #ffffff;
