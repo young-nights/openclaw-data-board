@@ -352,10 +352,14 @@
   .provider-name { font-size: 15px; font-weight: 600; color: #111827; }
   .provider-plan { font-size: 13px; font-weight: 500; margin-top: 2px; }
   .provider-actions { display: flex; align-items: center; gap: 8px; }
-  .delete-btn { background: none; border: 1px solid #e5e7eb; font-size: 20px; cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: all 120ms; line-height: 1; }
-  .delete-btn:hover { background: #fef2f2; }
-  .delete-confirm-btn { padding: 8px 14px; border: none; background: #ef4444; color: #ffffff; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; }
-  .delete-cancel-btn { padding: 8px 14px; border: 1px solid #e5e7eb; background: #ffffff; color: #374151; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer; }
+  .billing-link { font-size: 13px; font-weight: 600; color: #3b82f6; text-decoration: none; padding: 8px 16px; border: 1px solid #bfdbfe; border-radius: 10px; transition: all 150ms; white-space: nowrap; background: #eff6ff; }
+  .billing-link:hover { background: #3b82f6; color: #ffffff; border-color: #3b82f6; transform: scale(1.03); box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
+  .delete-btn { background: #f9fafb; border: 1px solid #e5e7eb; font-size: 18px; cursor: pointer; padding: 8px 12px; border-radius: 10px; transition: all 150ms; line-height: 1; color: #6b7280; }
+  .delete-btn:hover { background: #fef2f2; border-color: #fecaca; color: #ef4444; transform: scale(1.05); }
+  .delete-confirm-btn { padding: 8px 16px; border: none; background: linear-gradient(135deg, #ef4444, #dc2626); color: #ffffff; font-size: 13px; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 150ms; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); }
+  .delete-confirm-btn:hover { transform: scale(1.03); box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); }
+  .delete-cancel-btn { padding: 8px 16px; border: 1px solid #e5e7eb; background: #ffffff; color: #374151; font-size: 13px; font-weight: 500; border-radius: 10px; cursor: pointer; transition: all 150ms; }
+  .delete-cancel-btn:hover { background: #f9fafb; border-color: #d1d5db; }
   .provider-stats { display: flex; gap: 24px; }
   .provider-stat { display: flex; flex-direction: column; gap: 2px; }
   .provider-stat-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
