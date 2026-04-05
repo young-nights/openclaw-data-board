@@ -70,6 +70,11 @@
             <span class="model-value">{model.value}</span>
           </div>
         {/each}
+        <div class="model-row total-row">
+          <span class="model-dot" style="background: transparent"></span>
+          <span class="model-name">Total</span>
+          <span class="model-value">{value}</span>
+        </div>
       </div>
     {/if}
 
@@ -83,7 +88,7 @@
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 16px;
-    padding: 24px;
+    padding: 28px;
     transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
     cursor: default;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -128,29 +133,29 @@
   }
 
   .card-value {
-    font-size: 32px;
+    font-size: 36px;
     font-weight: 700;
     color: #111827;
     line-height: 1.1;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
     font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
     letter-spacing: -0.02em;
   }
 
-  /* Mini Chart - thin tall bars */
+  /* Mini Chart - moderate bars */
   .mini-chart {
     display: flex;
     align-items: flex-end;
     gap: 2px;
-    height: 64px;
-    margin-bottom: 16px;
-    padding: 0 4px;
+    height: 72px;
+    margin-bottom: 20px;
+    padding: 0 2px;
   }
 
   .mini-bar {
-    width: 3px;
+    width: 4px;
     flex: none;
-    border-radius: 1.5px 1.5px 0 0;
+    border-radius: 2px 2px 0 0;
     transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1);
     min-height: 1px;
   }
@@ -167,12 +172,12 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .model-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
   }
@@ -185,7 +190,19 @@
   .model-value {
     color: #6b7280;
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .total-row {
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .total-row .model-name,
+  .total-row .model-value {
+    font-weight: 600;
+    color: #111827;
   }
 
   .card-subtitle {

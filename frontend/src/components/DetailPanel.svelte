@@ -368,6 +368,7 @@
     position: relative;
     overflow: hidden;
     padding: 16px 16px 0 0;
+    contain: layout;
   }
 
   .chart-grid {
@@ -414,8 +415,8 @@
   }
 
   .bar-stack {
-    width: 4px;
-    max-width: 60%;
+    width: 6px;
+    max-width: 70%;
     display: flex;
     flex-direction: column-reverse;
     transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -427,58 +428,59 @@
     transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  /* Tooltip */
+  /* Tooltip - transparent, compact */
   .tooltip {
     position: absolute;
-    top: 8px;
+    top: -8px;
     transform: translateX(-50%);
-    background: #111827;
+    background: rgba(17, 24, 39, 0.88);
+    backdrop-filter: blur(8px);
     color: #f9fafb;
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 13px;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
     z-index: 10;
-    min-width: 180px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     pointer-events: none;
   }
 
   .tooltip-date {
-    font-size: 12px;
+    font-size: 10px;
     color: #d1d5db;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #374151;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .tooltip-models {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
   }
 
   .tooltip-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
+    gap: 6px;
+    font-size: 11px;
   }
 
   .tooltip-row span:first-child { flex: 1; }
-  .tooltip-row strong { font-family: 'SF Mono', monospace; }
+  .tooltip-row strong { font-family: 'SF Mono', monospace; font-size: 11px; }
 
   .tooltip-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
   }
 
   .tooltip-total {
-    margin-top: 8px;
-    padding-top: 6px;
-    border-top: 1px solid #374151;
-    font-size: 13px;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 11px;
     text-align: right;
   }
 

@@ -130,7 +130,8 @@
 
   <!-- Detail Overlay (full page) -->
   {#if detailView}
-    <div class="detail-overlay">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="detail-overlay" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('detail-overlay')) detailView = null; }}>
       <DetailPanel
         viewType={detailView}
         {language}
