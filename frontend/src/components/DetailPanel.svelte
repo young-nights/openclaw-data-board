@@ -462,7 +462,7 @@
     position: fixed;
     left: 0;
     top: 0;
-    transform: translate(4px, calc(var(--ty) - 50%));
+    transform: translate(0, calc(var(--ty) - 100% - 8px));
     z-index: 100;
     pointer-events: none;
     min-width: 220px;
