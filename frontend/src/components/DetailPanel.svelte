@@ -136,6 +136,13 @@
     });
   }
 
+  function formatVal(v: number): string {
+    if (viewType === 'spend') return `$${v < 0.01 ? v.toFixed(3) : v.toFixed(2)}`;
+    if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+    if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
+    return String(v);
+  }
+
   function shouldShowLabel(idx: number): boolean {
     if (barCount <= 12) return true;
     return idx % Math.ceil(barCount / 8) === 0 || idx === dayLabels.length - 1;
