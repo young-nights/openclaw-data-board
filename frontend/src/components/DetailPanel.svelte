@@ -19,7 +19,7 @@
 
   function showTooltip(idx: number, el: HTMLElement) {
     tooltipDay = idx;
-    const chartArea = el.closest('.chart-row') as HTMLElement;
+    const chartArea = el.closest('.chart-area') as HTMLElement;
     if (chartArea) {
       const cr = chartArea.getBoundingClientRect();
       const br = el.getBoundingClientRect();
@@ -30,7 +30,7 @@
 
   function onMouseMove(e: MouseEvent) {
     if (tooltipDay !== null) {
-      const chartArea = (e.currentTarget as HTMLElement).closest('.chart-row') as HTMLElement;
+      const chartArea = (e.currentTarget as HTMLElement).closest('.chart-area') as HTMLElement;
       if (chartArea) {
         const cr = chartArea.getBoundingClientRect();
         tooltipY = e.clientY - cr.top;
@@ -224,29 +224,29 @@
         </div>
       </div>
 
-      <!-- Tooltip - outside chart-area to avoid overflow:hidden -->
-      <div class="tooltip-wrap">
-        {#if tooltipDay !== null}
-          <div class="tooltip" style="--tx: {tooltipX}px; --ty: {tooltipY}px">
-            <div class="tooltip-date">{dayLabels[tooltipDay]}, 2026 at 8:00 AM</div>
-            <div class="tooltip-body">
-              {#each currentModels as model}
-                {#if model.data[tooltipDay] > 0}
-                  <div class="tooltip-row" class:hl={hoveredModel === model.name}>
-                    <span class="tooltip-dot" style="background: {model.color}"></span>
-                    <span class="tooltip-name">{model.name}</span>
-                    <span class="tooltip-val">{formatVal(model.data[tooltipDay])}</span>
-                  </div>
-                {/if}
-              {/each}
-              <div class="tooltip-total">
-                <span>Total</span>
-                <span class="tooltip-val">{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</span>
-              </div>
+      </div>
+
+      <!-- Tooltip -->
+      {#if tooltipDay !== null}
+        <div class="tooltip" style="--tx: {tooltipX}px; --ty: {tooltipY}px">
+          <div class="tooltip-date">{dayLabels[tooltipDay]}, 2026 at 8:00 AM</div>
+          <div class="tooltip-body">
+            {#each currentModels as model}
+              {#if model.data[tooltipDay] > 0}
+                <div class="tooltip-row" class:hl={hoveredModel === model.name}>
+                  <span class="tooltip-dot" style="background: {model.color}"></span>
+                  <span class="tooltip-name">{model.name}</span>
+                  <span class="tooltip-val">{formatVal(model.data[tooltipDay])}</span>
+                </div>
+              {/if}
+            {/each}
+            <div class="tooltip-total">
+              <span>Total</span>
+              <span class="tooltip-val">{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</span>
             </div>
           </div>
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Table -->
@@ -361,6 +361,7 @@
   .chart-area {
     flex: 1;
     position: relative;
+    overflow: visible;
     padding: 16px 16px 0 0;
   }
 
@@ -464,10 +465,6 @@
 
   .x-label.visible {
     visibility: visible;
-  }
-
-  .tooltip-wrap {
-    position: relative;
   }
 
   /* Tooltip */
