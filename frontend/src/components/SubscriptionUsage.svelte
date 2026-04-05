@@ -114,6 +114,7 @@
             <div class="provider-plan" style="color: {pp.color}">{pp.plan}</div>
           </div>
           <div class="provider-actions">
+            <a href={pp.billingUrl} target="_blank" class="billing-link">{t('Billing', '账单')} ↗</a>
             {#if deleteConfirmId === pp.id}
               <button class="delete-confirm-btn" onclick={() => deletePlan(pp.id)}>{t('Confirm', '确认')}</button>
               <button class="delete-cancel-btn" onclick={() => deleteConfirmId = null}>{t('Cancel', '取消')}</button>
@@ -350,11 +351,11 @@
   .provider-info { flex: 1; }
   .provider-name { font-size: 15px; font-weight: 600; color: #111827; }
   .provider-plan { font-size: 13px; font-weight: 500; margin-top: 2px; }
-  .provider-actions { display: flex; gap: 6px; }
-  .delete-btn { background: none; border: none; font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 120ms; }
+  .provider-actions { display: flex; align-items: center; gap: 8px; }
+  .delete-btn { background: none; border: 1px solid #e5e7eb; font-size: 20px; cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: all 120ms; line-height: 1; }
   .delete-btn:hover { background: #fef2f2; }
-  .delete-confirm-btn { padding: 4px 10px; border: none; background: #ef4444; color: #ffffff; font-size: 12px; border-radius: 6px; cursor: pointer; }
-  .delete-cancel-btn { padding: 4px 10px; border: 1px solid #e5e7eb; background: #ffffff; color: #374151; font-size: 12px; border-radius: 6px; cursor: pointer; }
+  .delete-confirm-btn { padding: 8px 14px; border: none; background: #ef4444; color: #ffffff; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; }
+  .delete-cancel-btn { padding: 8px 14px; border: 1px solid #e5e7eb; background: #ffffff; color: #374151; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer; }
   .provider-stats { display: flex; gap: 24px; }
   .provider-stat { display: flex; flex-direction: column; gap: 2px; }
   .provider-stat-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
