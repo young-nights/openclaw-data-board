@@ -1,4 +1,4 @@
-<!-- Card.svelte - Glassmorphism Card Component (Svelte 5 Runes) -->
+<!-- Card.svelte - Clean Card Component (OpenRouter-inspired) -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
@@ -25,9 +25,9 @@
   <div class="card-body">
     {#if isLoading}
       <div class="skeleton-lines">
-        <div class="skeleton-line" style="width: 80%;"></div>
-        <div class="skeleton-line" style="width: 60%;"></div>
-        <div class="skeleton-line" style="width: 45%;"></div>
+        <div class="skeleton-line" style="width: 75%;"></div>
+        <div class="skeleton-line" style="width: 55%;"></div>
+        <div class="skeleton-line" style="width: 40%;"></div>
       </div>
     {:else if children}
       {@render children()}
@@ -37,9 +37,8 @@
 
 <style>
   .card {
-    background: var(--bg-glass);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     overflow: hidden;
     transition: all var(--transition-normal);
@@ -51,8 +50,7 @@
   }
 
   .card-header {
-    padding: var(--space-md) var(--space-lg);
-    border-bottom: 1px solid var(--border-color);
+    padding: var(--space-lg) var(--space-lg) var(--space-md);
   }
 
   .card-title {
@@ -60,16 +58,18 @@
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
+    letter-spacing: -0.005em;
   }
 
   .card-subtitle {
     font-size: var(--font-size-xs);
     color: var(--text-muted);
     margin: var(--space-xs) 0 0;
+    line-height: 1.4;
   }
 
   .card-body {
-    padding: var(--space-lg);
+    padding: 0 var(--space-lg) var(--space-lg);
   }
 
   .skeleton-lines {
@@ -80,7 +80,7 @@
 
   .skeleton-line {
     height: 12px;
-    background: linear-gradient(90deg, var(--bg-card) 25%, rgba(255,255,255,0.05) 50%, var(--bg-card) 75%);
+    background: linear-gradient(90deg, var(--bg-card) 25%, rgba(255,255,255,0.04) 50%, var(--bg-card) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
     border-radius: var(--radius-sm);

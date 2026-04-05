@@ -78,8 +78,8 @@
     <DocsSection {language} {loading} />
 
   {:else if section === 'usage-cost'}
-    <div class="dashboard-grid">
-      <UsageCost {language} {loading} />
+    <UsageCost {language} {loading} />
+    <div class="dashboard-grid" style="margin-top: var(--space-lg)">
       <ContextPressure {language} {loading} />
     </div>
 
