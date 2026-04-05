@@ -1,4 +1,4 @@
-<!-- DetailPanel.svelte - OpenRouter-style Detail View -->
+<!-- DetailPanel.svelte - OpenRouter-style Detail View (Fixed) -->
 <script lang="ts">
   import type { UiLanguage } from '../types';
 
@@ -17,164 +17,222 @@
   let sortAsc = $state(false);
 
   const config = {
-    spend: {
-      title: t('Spend By Model', '按模型花费'),
-      unit: '$',
-      yLabels: ['0.02', '0.04', '0.06', '0.08'],
-      yMax: 0.08,
-    },
-    requests: {
-      title: t('Requests By Model', '按模型请求数'),
-      unit: '',
-      yLabels: ['1K', '2K', '3K', '4K'],
-      yMax: 4000,
-    },
-    tokens: {
-      title: t('Tokens By Model', '按模型 Token'),
-      unit: '',
-      yLabels: ['85M', '170M', '255M', '340M'],
-      yMax: 340000000,
-    },
+    spend: { title: t('Spend By Model', '按模型花费'), unit: '$' },
+    requests: { title: t('Requests By Model', '按模型请求数'), unit: '' },
+    tokens: { title: t('Tokens By Model', '按模型 Token'), unit: '' },
   };
-
   const cfg = $derived(config[viewType]);
 
-  // Time labels for X axis
-  const xLabels = ['Mar 6, 8:00 AM', 'Mar 13, 8:00 AM', 'Mar 20, 8:00 AM', 'Mar 27, 8:00 AM', 'Apr 3, 8:00 AM'];
+  // Daily data - one bar per day (30 days)
+  const dayLabels = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(2026, 2, 6 + i);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
 
-  // Mock stacked data per model per time period
+  function genDaily(base: number, spike: number, spikeDay: number): number[] {
+    return dayLabels.map((_, i) => {
+      if (i < spikeDay - 5) return Math.round(base * (0.3 + Math.random() * 0.7));
+      if (i < spikeDay) return Math.round(base * (1 + (i - spikeDay + 5) * 0.4));
+      if (i === spikeDay) return spike;
+      if (i < spikeDay + 5) return Math.round(spike * (0.2 + Math.random() * 0.3));
+      return Math.round(base * (0.4 + Math.random() * 0.6));
+    });
+  }
+
   const models = {
     spend: [
-      { name: 'MiMo-V2-Pro', color: '#f5a623', data: [0, 0, 0.002, 0.008, 0.0679] },
-      { name: 'DeepSeek V3', color: '#3ecf8e', data: [0, 0, 0, 0.002, 0.00552] },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: [0, 0, 0, 0, 0] },
+      { name: 'MiMo-V2-Pro', color: '#f5a623', data: genDaily(1, 67, 28) },
+      { name: 'DeepSeek V3', color: '#3ecf8e', data: genDaily(0.5, 5, 28) },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: dayLabels.map(() => 0) },
     ],
     requests: [
-      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: [200, 350, 800, 1200, 6030] },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: [50, 80, 120, 200, 507] },
-      { name: 'DeepSeek V3', color: '#f5a623', data: [0, 0, 1, 1, 2] },
+      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(80, 2300, 28) },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(15, 85, 28) },
+      { name: 'DeepSeek V3', color: '#f5a623', data: dayLabels.map(() => Math.round(Math.random() * 2)) },
     ],
     tokens: [
-      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: [10000000, 15000000, 40000000, 85000000, 608000000] },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: [2000000, 3000000, 5000000, 8000000, 25200000] },
-      { name: 'DeepSeek V3', color: '#f5a623', data: [0, 0, 1000, 5000, 11000] },
+      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(5000000, 120000000, 28) },
+      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(800000, 5000000, 28) },
+      { name: 'DeepSeek V3', color: '#f5a623', data: dayLabels.map(() => Math.round(Math.random() * 5000)) },
     ],
   };
 
   const currentModels = $derived(models[viewType]);
 
-  // Calculate max stacked value for chart scaling
+  // Max stacked value
   const maxStacked = $derived(
-    Math.max(...Array(5).fill(0).map((_, i) =>
+    Math.max(...dayLabels.map((_, i) =>
       currentModels.reduce((sum, m) => sum + m.data[i], 0)
     ))
   );
 
-  // Table data
-  let tableData = $state([
-    { model: 'MiMo-V2-Pro', color: '#f5a623', min: 0, max: 0.067, avg: 0.00679, sum: 0.0679 },
-    { model: 'DeepSeek V3', color: '#3ecf8e', min: 0.00552, max: 0.00552, avg: 0.00552, sum: 0.00552 },
-    { model: 'MiMo-V2-Omni', color: '#7c9aff', min: 0, max: 0, avg: 0, sum: 0 },
-  ]);
-
-  function handleSort(key: string) {
-    if (sortKey === key) {
-      sortAsc = !sortAsc;
-    } else {
-      sortKey = key;
-      sortAsc = false;
+  // Nice Y-axis max
+  function niceMax(v: number): number {
+    if (viewType === 'spend') {
+      const steps = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+      return (steps.find(s => s >= v * 1.2) ?? v * 1.2) / 100;
     }
-    tableData = [...tableData].sort((a: any, b: any) => {
-      const av = a[key] ?? 0;
-      const bv = b[key] ?? 0;
-      return sortAsc ? av - bv : bv - av;
-    });
+    const mag = Math.pow(10, Math.floor(Math.log10(v || 1)));
+    const norm = v / mag;
+    const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+    return nice * mag;
   }
 
+  const yMax = $derived(niceMax(maxStacked || 1));
+
+  function yLabelsFromMax(max: number): string[] {
+    if (viewType === 'spend') {
+      return [0, 1, 2, 3, 4].map(i => `$${(max * i / 4).toFixed(2)}`).reverse();
+    }
+    return [0, 1, 2, 3, 4].map(i => {
+      const v = max * i / 4;
+      if (v >= 1000000) return `${(v / 1000000).toFixed(0)}M`;
+      if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
+      return String(Math.round(v));
+    }).reverse();
+  }
+
+  const currentYLabels = $derived(yLabelsFromMax(yMax));
+
+  // Tooltip
+  let tooltipDay = $state<number | null>(null);
+  let tooltipEl = $state<HTMLElement | null>(null);
+
+  function showTooltip(e: MouseEvent, idx: number) {
+    tooltipDay = idx;
+    const target = e.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const container = target.closest('.chart-area')?.getBoundingClientRect();
+    if (container) {
+      tooltipX = rect.left - container.left + rect.width / 2;
+    }
+  }
+
+  function hideTooltip() { tooltipDay = null; }
+
+  let tooltipX = $state(0);
+
   function formatVal(v: number): string {
-    if (viewType === 'spend') return `$${v}`;
+    if (viewType === 'spend') return `$${v < 0.01 ? v.toFixed(3) : v.toFixed(2)}`;
     if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
     if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
     return String(v);
   }
 
+  // Table data
+  let tableData = $state([
+    { model: 'MiMo-V2-Pro', color: '#f5a623', min: 0, max: 2300, avg: 603, sum: 6030 },
+    { model: 'MiMo-V2-Omni', color: '#7c9aff', min: 16, max: 218, avg: 84.5, sum: 507 },
+    { model: 'DeepSeek V3', color: '#3ecf8e', min: 2, max: 2, avg: 2, sum: 2 },
+  ]);
+
+  function handleSort(key: string) {
+    if (sortKey === key) sortAsc = !sortAsc;
+    else { sortKey = key; sortAsc = false; }
+    tableData = [...tableData].sort((a: any, b: any) => {
+      const av = a[key] ?? 0, bv = b[key] ?? 0;
+      return sortAsc ? av - bv : bv - av;
+    });
+  }
+
   function exportCSV() {
-    const headers = ['Model', 'Min', 'Max', 'Avg', 'Sum'];
-    const rows = tableData.map(r => [r.model, r.min, r.max, r.avg, r.sum]);
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const csv = ['Model,Min,Max,Avg,Sum', ...tableData.map(r => `${r.model},${r.min},${r.max},${r.avg},${r.sum}`)].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `activity-${viewType}-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    a.href = url; a.download = `activity-${viewType}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
-  const tokenFilters = [
-    { key: 'total' as const, label: 'Total' },
-    { key: 'prompt' as const, label: 'Prompt' },
-    { key: 'completion' as const, label: 'Completion' },
-    { key: 'reasoning' as const, label: 'Reasoning' },
-    { key: 'cached' as const, label: 'Cached' },
-  ];
+  // X-axis: show every 5th label
+  function shouldShowLabel(idx: number): boolean {
+    return idx % 5 === 0 || idx === dayLabels.length - 1;
+  }
 </script>
 
 <div class="detail-panel">
-  <!-- Header -->
   <div class="detail-header">
     <h3>{cfg.title}</h3>
     <div class="header-right">
       {#if viewType === 'tokens'}
         <select class="filter-select" bind:value={tokenFilter}>
-          {#each tokenFilters as f}
-            <option value={f.key}>{f.label}</option>
-          {/each}
+          <option value="total">Total</option>
+          <option value="prompt">Prompt</option>
+          <option value="completion">Completion</option>
+          <option value="reasoning">Reasoning</option>
+          <option value="cached">Cached</option>
         </select>
       {/if}
-      <button class="icon-btn" title="Settings">⚙️</button>
+      <button class="icon-btn" onclick={exportCSV}>📥</button>
       <button class="icon-btn close-btn" onclick={onClose}>✕</button>
     </div>
   </div>
 
-  <!-- Stacked Bar Chart -->
-  <div class="chart-container">
-    <!-- Y Axis Labels -->
-    <div class="y-axis">
-      {#each cfg.yLabels.slice().reverse() as label}
-        <span class="y-label">{label}</span>
-      {/each}
-    </div>
-
-    <!-- Chart Area -->
-    <div class="chart-area">
-      <div class="chart-grid">
-        {#each cfg.yLabels as _}
-          <div class="grid-line"></div>
+  <!-- Chart with overflow hidden -->
+  <div class="chart-wrapper">
+    <div class="chart-container">
+      <!-- Y Axis -->
+      <div class="y-axis">
+        {#each currentYLabels as label}
+          <span class="y-label">{label}</span>
         {/each}
       </div>
 
-      <div class="bars-container">
-        {#each Array(5) as _, i}
-          <div class="bar-group">
-            {#each currentModels as model}
-              {@const val = model.data[i]}
-              {@const pct = cfg.yMax > 0 ? (val / cfg.yMax) * 100 : 0}
-              <div
-                class="stacked-bar"
-                style="height: {pct}%; background: {model.color};"
-                title="{model.name}: {formatVal(val)}"
-              ></div>
-            {/each}
+      <!-- Chart Area (overflow hidden clips bars) -->
+      <div class="chart-area">
+        <div class="chart-grid">
+          {#each currentYLabels as _}
+            <div class="grid-line"></div>
+          {/each}
+        </div>
+
+        <div class="bars-row">
+          {#each dayLabels as _, i}
+            {@const total = currentModels.reduce((s, m) => s + m.data[i], 0)}
+            {@const pct = yMax > 0 ? (total / yMax) * 100 : 0}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="bar-cell"
+              onmouseenter={(e) => showTooltip(e, i)}
+              onmouseleave={hideTooltip}
+            >
+              <div class="bar-stack" style="height: {Math.min(pct, 100)}%">
+                {#each currentModels.slice().reverse() as model}
+                  {@const mpct = yMax > 0 ? (model.data[i] / yMax) * 100 : 0}
+                  <div class="bar-segment" style="height: {Math.min(mpct, 100)}%; background: {model.color}"></div>
+                {/each}
+              </div>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Tooltip -->
+        {#if tooltipDay !== null}
+          <div class="tooltip" style="left: {tooltipX}px">
+            <div class="tooltip-date">{dayLabels[tooltipDay]}, 2026 at 8:00 AM</div>
+            <div class="tooltip-models">
+              {#each currentModels as model}
+                {#if model.data[tooltipDay] > 0}
+                  <div class="tooltip-row">
+                    <span class="tooltip-dot" style="background: {model.color}"></span>
+                    <span>{model.name}</span>
+                    <strong>{formatVal(model.data[tooltipDay])}</strong>
+                  </div>
+                {/if}
+              {/each}
+            </div>
+            <div class="tooltip-total">
+              Total: <strong>{formatVal(currentModels.reduce((s, m) => s + m.data[tooltipDay], 0))}</strong>
+            </div>
           </div>
-        {/each}
-      </div>
+        {/if}
 
-      <!-- X Axis Labels -->
-      <div class="x-axis">
-        {#each xLabels as label}
-          <span class="x-label">{label}</span>
-        {/each}
+        <!-- X Axis -->
+        <div class="x-axis">
+          {#each dayLabels as label, i}
+            <span class="x-label" class:visible={shouldShowLabel(i)}>{shouldShowLabel(i) ? label : ''}</span>
+          {/each}
+        </div>
       </div>
     </div>
   </div>
@@ -185,19 +243,19 @@
       <thead>
         <tr>
           <th class="sortable" onclick={() => handleSort('model')}>
-            Model <span class="sort-icon">{sortKey === 'model' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            Model <span class="sort-ico">{sortKey === 'model' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
           <th class="num sortable" onclick={() => handleSort('min')}>
-            Min {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'min' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            Min <span class="sort-ico">{sortKey === 'min' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
           <th class="num sortable" onclick={() => handleSort('max')}>
-            Max {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'max' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            Max <span class="sort-ico">{sortKey === 'max' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
           <th class="num sortable" onclick={() => handleSort('avg')}>
-            Avg {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'avg' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            Avg <span class="sort-ico">{sortKey === 'avg' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
           <th class="num sortable highlight" onclick={() => handleSort('sum')}>
-            Sum {viewType === 'spend' ? '($)' : '(tok)'} <span class="sort-icon">{sortKey === 'sum' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+            Sum <span class="sort-ico">{sortKey === 'sum' ? (sortAsc ? '↑' : '↓') : '↕'}</span>
           </th>
         </tr>
       </thead>
@@ -208,10 +266,10 @@
               <span class="model-dot" style="background: {row.color}"></span>
               {row.model}
             </td>
-            <td class="num">{formatVal(row.min)}</td>
-            <td class="num">{formatVal(row.max)}</td>
-            <td class="num">{formatVal(row.avg)}</td>
-            <td class="num highlight">{formatVal(row.sum)}</td>
+            <td class="num">{row.min}</td>
+            <td class="num">{row.max}</td>
+            <td class="num">{row.avg}</td>
+            <td class="num highlight">{row.sum}</td>
           </tr>
         {/each}
       </tbody>
@@ -233,7 +291,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
 
   .detail-header h3 {
@@ -255,15 +313,14 @@
     border-radius: 8px;
     font-size: 13px;
     color: #374151;
-    background: #ffffff;
-    outline: none;
+    background: #fff;
   }
 
   .icon-btn {
     width: 32px;
     height: 32px;
     border: 1px solid #e5e7eb;
-    background: #ffffff;
+    background: #fff;
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
@@ -273,25 +330,28 @@
     transition: all 120ms;
   }
 
-  .icon-btn:hover {
-    background: #f9fafb;
-    border-color: #d1d5db;
+  .icon-btn:hover { background: #f9fafb; }
+
+  /* Chart - overflow hidden clips bars */
+  .chart-wrapper {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
   }
 
-  /* Chart */
   .chart-container {
     display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-    height: 240px;
+    gap: 0;
+    height: 260px;
   }
 
   .y-axis {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 8px 0;
-    min-width: 48px;
+    padding: 16px 12px 28px 16px;
+    min-width: 56px;
   }
 
   .y-label {
@@ -304,11 +364,13 @@
   .chart-area {
     flex: 1;
     position: relative;
+    overflow: hidden;
+    padding: 16px 16px 0 0;
   }
 
   .chart-grid {
     position: absolute;
-    inset: 8px 0 28px 0;
+    inset: 16px 0 28px 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -319,57 +381,124 @@
     width: 100%;
   }
 
-  .bars-container {
+  /* Bars - stacked, one per day */
+  .bars-row {
     position: absolute;
-    inset: 8px 0 28px 0;
+    inset: 16px 0 28px 0;
     display: flex;
     align-items: flex-end;
-    justify-content: space-around;
-    gap: 16px;
-    padding: 0 24px;
+    gap: 1px;
   }
 
-  .bar-group {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
+  .bar-cell {
     flex: 1;
-    max-width: 48px;
     height: 100%;
-  }
-
-  .stacked-bar {
-    flex: 1;
-    border-radius: 3px 3px 0 0;
-    transition: height 350ms cubic-bezier(0.22, 1, 0.36, 1);
-    min-height: 1px;
+    display: flex;
+    align-items: flex-end;
     cursor: pointer;
+    position: relative;
   }
 
-  .stacked-bar:hover {
-    opacity: 0.85;
+  .bar-cell:hover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.04);
   }
 
+  .bar-stack {
+    width: 100%;
+    display: flex;
+    flex-direction: column-reverse;
+    transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .bar-segment {
+    width: 100%;
+    min-height: 0;
+    transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    top: 8px;
+    transform: translateX(-50%);
+    background: #111827;
+    color: #f9fafb;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    z-index: 10;
+    min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+  }
+
+  .tooltip-date {
+    font-size: 12px;
+    color: #d1d5db;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #374151;
+  }
+
+  .tooltip-models {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .tooltip-row span:first-child { flex: 1; }
+  .tooltip-row strong { font-family: 'SF Mono', monospace; }
+
+  .tooltip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tooltip-total {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid #374151;
+    font-size: 13px;
+    text-align: right;
+  }
+
+  /* X Axis */
   .x-axis {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     display: flex;
-    justify-content: space-around;
-    padding: 8px 24px 0;
+    padding-top: 8px;
   }
 
   .x-label {
-    font-size: 11px;
+    flex: 1;
+    font-size: 10px;
     color: #9ca3af;
+    text-align: center;
     white-space: nowrap;
+    visibility: hidden;
+  }
+
+  .x-label.visible {
+    visibility: visible;
   }
 
   /* Table */
-  .table-container {
-    overflow-x: auto;
-  }
+  .table-container { overflow-x: auto; }
 
   .detail-table {
     width: 100%;
@@ -386,26 +515,17 @@
     white-space: nowrap;
   }
 
-  .detail-table th.num {
-    text-align: right;
-  }
-
-  .detail-table th.highlight {
-    color: #111827;
-    font-weight: 600;
-  }
+  .detail-table th.num { text-align: right; }
+  .detail-table th.highlight { color: #111827; font-weight: 600; }
 
   .sortable {
     cursor: pointer;
     user-select: none;
-    transition: color 120ms;
   }
 
-  .sortable:hover {
-    color: #111827;
-  }
+  .sortable:hover { color: #111827; }
 
-  .sort-icon {
+  .sort-ico {
     font-size: 10px;
     margin-left: 4px;
     color: #d1d5db;
@@ -420,7 +540,7 @@
 
   .detail-table td.num {
     text-align: right;
-    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-family: 'SF Mono', monospace;
     font-size: 13px;
     color: #6b7280;
   }
@@ -446,7 +566,5 @@
     flex-shrink: 0;
   }
 
-  .detail-table tbody tr:hover {
-    background: #f9fafb;
-  }
+  .detail-table tbody tr:hover { background: #f9fafb; }
 </style>
