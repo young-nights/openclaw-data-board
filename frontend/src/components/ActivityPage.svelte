@@ -31,28 +31,44 @@
     { key: 'provider' as const, label: t('By Provider', '按供应商') },
   ];
 
-  // Mock data matching OpenRouter style
+  // Mock raw model data - dynamic based on actual usage
+  // Models with zero total are automatically filtered out
+  const allModels = [
+    { name: 'MiMo-V2-Pro', color: '#f5a623', spend: 0.0679, requests: 6030, tokens: 608000000 },
+    { name: 'DeepSeek V3', color: '#3ecf8e', spend: 0.00552, requests: 2, tokens: 11000 },
+    { name: 'MiMo-V2-Omni', color: '#7c9aff', spend: 0, requests: 507, tokens: 25200000 },
+  ];
+
+  // Filter to only models with non-zero usage (dynamic display)
+  function formatNum(n: number): string {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    if (n < 0.01) return n.toFixed(4);
+    return String(n);
+  }
+
+  const spendModels = $derived(
+    allModels
+      .filter(m => m.spend > 0)
+      .map(m => ({ name: m.name, value: formatNum(m.spend), color: m.color }))
+  );
+
+  const requestsModels = $derived(
+    allModels
+      .filter(m => m.requests > 0)
+      .map(m => ({ name: m.name, value: formatNum(m.requests), color: m.color }))
+  );
+
+  const tokensModels = $derived(
+    allModels
+      .filter(m => m.tokens > 0)
+      .map(m => ({ name: m.name, value: formatNum(m.tokens), color: m.color }))
+  );
+
+  // Mini chart data for the cards (last 7 days)
   const spendChartData = [0.01, 0.005, 0.02, 0.015, 0.08, 0.06, 0.07];
   const requestsChartData = [120, 80, 200, 150, 350, 280, 310];
   const tokensChartData = [15000, 8000, 25000, 18000, 65000, 48000, 55000];
-
-  const spendModels = [
-    { name: 'MiMo-V2-Pro', value: '0.0679', color: '#f5a623' },
-    { name: 'DeepSeek V3', value: '0.00552', color: '#3ecf8e' },
-    { name: 'MiMo-V2-Omni', value: '0', color: '#7c9aff' },
-  ];
-
-  const requestsModels = [
-    { name: 'MiMo-V2-Pro', value: '6.03K', color: '#00d4aa' },
-    { name: 'MiMo-V2-Omni', value: '507', color: '#7c9aff' },
-    { name: 'DeepSeek V3', value: '2', color: '#f5a623' },
-  ];
-
-  const tokensModels = [
-    { name: 'MiMo-V2-Pro', value: '608M', color: '#00d4aa' },
-    { name: 'MiMo-V2-Omni', value: '25.2M', color: '#7c9aff' },
-    { name: 'DeepSeek V3', value: '11K', color: '#f5a623' },
-  ];
 
   function handleRefresh() {
     lastUpdated = new Date();
@@ -155,7 +171,7 @@
 
 <style>
   .activity-page {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     width: 100%;
   }
@@ -229,13 +245,13 @@
     border-color: #3b82f6;
   }
 
-  /* Metrics Row - wider cards */
+  /* Metrics Row - wider and taller cards */
   .metrics-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-bottom: 24px;
-    max-width: 1200px;
+    gap: 24px;
+    margin-bottom: 28px;
+    max-width: 1400px;
   }
 
   @media (max-width: 900px) {

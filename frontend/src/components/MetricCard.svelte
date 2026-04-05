@@ -88,10 +88,13 @@
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 16px;
-    padding: 28px;
+    padding: 32px 32px 28px;
     transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
     cursor: default;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
   }
 
   .metric-card.clickable {
@@ -133,7 +136,7 @@
   }
 
   .card-value {
-    font-size: 36px;
+    font-size: 40px;
     font-weight: 700;
     color: #111827;
     line-height: 1.1;
@@ -147,9 +150,10 @@
     display: flex;
     align-items: flex-end;
     gap: 2px;
-    height: 72px;
+    height: 80px;
     margin-bottom: 20px;
     padding: 0 2px;
+    flex: 1;
   }
 
   .mini-bar {
