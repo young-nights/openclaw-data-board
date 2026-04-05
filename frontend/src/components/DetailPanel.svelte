@@ -140,24 +140,16 @@
 
   function showTooltip(e: MouseEvent, idx: number) {
     tooltipDay = idx;
-    const target = e.currentTarget as HTMLElement;
-    // Find the bar-stack inside this bar-cell
-    const barStack = target.querySelector('.bar-stack');
-    const stackRect = barStack?.getBoundingClientRect();
-    const cellRect = target.getBoundingClientRect();
-    if (stackRect) {
-      // Position at top-center of the stacked bar
-      tooltipX = stackRect.left + stackRect.width / 2;
-      tooltipY = stackRect.top;
-    } else {
-      tooltipX = cellRect.left + cellRect.width / 2;
-      tooltipY = cellRect.top;
+    const barCell = e.currentTarget as HTMLElement;
+    const barStack = barCell.querySelector('.bar-stack');
+    if (barStack) {
+      const r = barStack.getBoundingClientRect();
+      tooltipX = Math.round(r.left + r.width / 2);
+      tooltipY = Math.round(r.top);
     }
   }
 
-  function moveTooltip(e: MouseEvent) {
-    // Position set on enter
-  }
+  function moveTooltip(e: MouseEvent) {}
 
   function highlightModel(modelName: string | null) {
     hoveredModel = modelName;
@@ -516,10 +508,9 @@
   /* Tooltip - centered above bar */
   .tooltip {
     position: fixed;
-    left: var(--tooltip-x);
-    top: var(--tooltip-y);
-    transform: translate(-50%, -100%);
-    margin-top: -10px;
+    left: 0;
+    top: 0;
+    transform: translate(calc(var(--tooltip-x) - 50%), calc(var(--tooltip-y) - 100% - 10px));
     z-index: 100;
     pointer-events: none;
     min-width: 150px;
@@ -536,7 +527,6 @@
     position: absolute;
     bottom: -5px;
     left: 50%;
-    transform: translateX(-50%);
     width: 10px;
     height: 10px;
     background: #ffffff;
