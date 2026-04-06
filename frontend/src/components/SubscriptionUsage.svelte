@@ -13,17 +13,98 @@
   let activeTab = $state<'agent' | 'model' | 'key'>('agent');
 
   // Per-provider subscription data
-  let providerPlans = $state<ProviderPlan[]>([
-    { id: '1', provider: 'Xiaomi MiMo', logo: '⚡', plan: 'Free', credit: '$0.00', creditLimit: '$0.00', cost: '$0.0679', requests: 6537, billingUrl: '#', color: '#f5a623' },
-    { id: '2', provider: 'DeepSeek', logo: '🧠', plan: 'Free', credit: '$0.00', creditLimit: '$0.00', cost: '$0.00556', requests: 2, billingUrl: '#', color: '#3ecf8e' },
-  ]);
+  let providerPlans = $state<ProviderPlan[]>([]);
+  let subscriptionData = $state<any>(null);
+  let usageData = $state<any>(null);
+  
+  async function fetchData() {
+    try {
+      const res = await fetch('/api/usage-cost');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok || !data.usage) return;
+      
+      const usage = data.usage;
+      subscriptionData = usage.subscription || null;
+      
+      // Only load from snapshot if no cards are present (initial load)
+      if (providerPlans.length === 0 && subscriptionData && subscriptionData.status === 'connected') {
+        providerPlans = [{
+          id: crypto.randomUUID?.() ?? Date.now().toString(),
+          provider: subscriptionData.provider || 'Xiaomi MiMo',
+          logo: '⚡',
+          plan: subscriptionData.planLabel,
+          credit: `${(subscriptionData.consumed / 1e6).toFixed(1)}M`,
+          creditLimit: subscriptionData.limit ? `${(subscriptionData.limit / 1e6).toFixed(1)}M` : 'N/A',
+          cost: `$${(subscriptionData.consumed / 1e6 * 0.002).toFixed(4)}`,
+          requests: Math.round(subscriptionData.consumed / 1000),
+          billingUrl: subscriptionData.billingUrl || '#',
+          color: '#f5a623'
+        }];
+      }
+    } catch (e) {
+      console.error('Failed to fetch subscription data:', e);
+    }
+  }
+  
+  $effect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  });
 
   let showAddForm = $state(false);
   let deleteConfirmId = $state<string | null>(null);
 
-  function addPlan(plan: ProviderPlan) {
-    providerPlans = [...providerPlans, plan];
+  async function addPlan(plan: ProviderPlan) {
     showAddForm = false;
+    
+    // Save to subscription snapshot
+    try {
+      const snapshotData = {
+        subscription: {
+          planLabel: plan.plan,
+          provider: plan.provider,
+          unit: plan.plan.includes('Token') ? 'Tokens' : 'USD',
+          consumed: 0,
+          remaining: 0,
+          limit: 0,
+          cycleStart: new Date().toISOString().slice(0, 10),
+          cycleEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          billingUrl: plan.billingUrl
+        }
+      };
+      await fetch('/api/subscription/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snapshotData)
+      });
+      
+      // Fetch updated data and fill card
+      const res = await fetch('/api/usage-cost');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && data.usage && data.usage.subscription) {
+          const sub = data.usage.subscription;
+          if (sub.status === 'connected') {
+            const filledPlan: ProviderPlan = {
+              ...plan,
+              credit: `${(sub.consumed / 1e6).toFixed(1)}M`,
+              creditLimit: sub.limit ? `${(sub.limit / 1e6).toFixed(1)}M` : 'N/A',
+              cost: `$${(sub.consumed / 1e6 * 0.002).toFixed(4)}`,
+              requests: Math.round(sub.consumed / 1000)
+            };
+            providerPlans = [...providerPlans, filledPlan];
+            return;
+          }
+        }
+      }
+      // Fallback: add with default values
+      providerPlans = [...providerPlans, plan];
+    } catch (e) {
+      console.error('Failed to save subscription:', e);
+      providerPlans = [...providerPlans, plan];
+    }
   }
 
   function deletePlan(id: string) {
@@ -32,41 +113,28 @@
   }
 
   const totalCost = $derived(providerPlans.reduce((sum, p) => sum + parseFloat(p.cost.replace('$', '')), 0).toFixed(4));
+  
+  function formatNum(n: number): string {
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+    return String(n);
+  }
 
   // Agent data
-  const agentData = [
-    { agent: 'main', icon: '🦞', model: 'MiMo-V2-Pro', requests: 2100, tokens: '220M', cost: '$0.032', pct: 43 },
-    { agent: 'coder', icon: '🐒', model: 'MiMo-V2-Pro', requests: 1800, tokens: '180M', cost: '$0.028', pct: 38 },
-    { agent: 'secretary', icon: '🦊', model: 'MiMo-V2-Flash', requests: 1200, tokens: '45M', cost: '$0.005', pct: 7 },
-    { agent: 'analyst', icon: '🦉', model: 'DeepSeek V3', requests: 850, tokens: '95M', cost: '$0.006', pct: 8 },
-    { agent: 'evaluator', icon: '🐻', model: 'MiMo-V2-Pro', requests: 589, tokens: '68M', cost: '$0.006', pct: 4 },
-  ];
+  const agentData: Array<{ agent: string; icon: string; model: string; requests: number; tokens: string; cost: string; pct: number }> = [];
 
-  const modelData = [
-    { model: 'MiMo-V2-Pro', color: '#f5a623', requests: 4489, tokens: '468M', cost: '$0.066', agents: ['main', 'coder', 'evaluator'] },
-    { model: 'MiMo-V2-Omni', color: '#7c9aff', requests: 507, tokens: '25M', cost: '$0.00552', agents: ['main'] },
-    { model: 'DeepSeek V3', color: '#3ecf8e', requests: 852, tokens: '95M', cost: '$0.006', agents: ['analyst'] },
-    { model: 'MiMo-V2-Flash', color: '#f472b6', requests: 1200, tokens: '45M', cost: '$0.005', agents: ['secretary'] },
-  ];
+  const modelData: Array<{ model: string; color: string; requests: number; tokens: string; cost: string; agents: string[] }> = [];
 
-  const keyData = [
-    { name: 'openclaw-desktop', key: 'sk-...a1b2', requests: 4520, cost: '$0.0520', models: ['MiMo-V2-Pro', 'MiMo-V2-Omni'], agents: ['main', 'coder'] },
-    { name: 'openclaw-server', key: 'sk-...c3d4', requests: 2019, cost: '$0.0215', models: ['MiMo-V2-Pro', 'DeepSeek V3'], agents: ['evaluator', 'analyst'] },
-  ];
+  const keyData: Array<{ name: string; key: string; requests: number; cost: string; models: string[]; agents: string[] }> = [];
 
   let expandedAgent = $state<string | null>(null);
 
   function genTrend(base: number): number[] {
-    return Array.from({ length: 7 }, (_, i) => Math.round(base * (0.6 + Math.random() * 0.8)));
+    return Array.from({ length: 7 }, () => 0);
   }
 
-  const agentTrends: Record<string, number[]> = {
-    main: genTrend(300),
-    coder: genTrend(257),
-    secretary: genTrend(171),
-    analyst: genTrend(121),
-    evaluator: genTrend(84),
-  };
+  const agentTrends: Record<string, number[]> = {};
 
   const weekLabels = ['Mar 30', 'Mar 31', 'Apr 1', 'Apr 2', 'Apr 3', 'Apr 4', 'Apr 5'];
 
@@ -114,23 +182,23 @@
   <div class="sub-cards-row">
     <div class="sub-card">
       <div class="sub-card-label">{t('Total Cost', '总花费')}</div>
-      <div class="sub-card-value cost">${totalCost}</div>
+      <div class="sub-card-value cost">$0.0000</div>
       <div class="sub-card-detail">{t('All providers combined', '所有供应商合计')}</div>
     </div>
     <div class="sub-card">
       <div class="sub-card-label">{t('Active Providers', '活跃供应商')}</div>
-      <div class="sub-card-value">{providerPlans.length}</div>
-      <div class="sub-card-detail">{t('Across 4 models', '使用 4 个模型')}</div>
+      <div class="sub-card-value">0</div>
+      <div class="sub-card-detail">{t('From config', '从配置读取')}</div>
     </div>
     <div class="sub-card">
       <div class="sub-card-label">{t('Active Agents', '活跃 Agent')}</div>
-      <div class="sub-card-value">5</div>
-      <div class="sub-card-detail">{t('All running', '全部运行中')}</div>
+      <div class="sub-card-value">0</div>
+      <div class="sub-card-detail">{t('With activity', '有活动记录')}</div>
     </div>
     <div class="sub-card">
       <div class="sub-card-label">{t('Total Requests', '总请求数')}</div>
-      <div class="sub-card-value">6,539</div>
-      <div class="sub-card-detail">{t('Last 7 days', '近 7 天')}</div>
+      <div class="sub-card-value">0</div>
+      <div class="sub-card-detail">{t('All time', '累计')}</div>
     </div>
   </div>
 
@@ -145,7 +213,9 @@
             <div class="provider-plan" style="color: {pp.color}">{pp.plan}</div>
           </div>
           <div class="provider-actions">
-            <a href={pp.billingUrl} target="_blank" class="billing-link">{t('Billing', '账单')} ↗</a>
+            <a href={pp.billingUrl} target="_blank" class="billing-link">
+              {pp.plan.includes('Plan') ? t('Plan', '套餐') : t('Usage', '用量')} ↗
+            </a>
             {#if deleteConfirmId === pp.id}
               <button class="delete-confirm-btn" onclick={() => deletePlan(pp.id)}>{t('Confirm', '确认')}</button>
               <button class="delete-cancel-btn" onclick={() => deleteConfirmId = null}>{t('Cancel', '取消')}</button>
@@ -154,19 +224,64 @@
             {/if}
           </div>
         </div>
-        <div class="provider-stats">
-          <div class="provider-stat">
-            <span class="provider-stat-label">{t('Cost', '花费')}</span>
-            <span class="provider-stat-value">{pp.cost}</span>
-          </div>
-          <div class="provider-stat">
-            <span class="provider-stat-label">{t('Requests', '请求数')}</span>
-            <span class="provider-stat-value">{pp.requests.toLocaleString()}</span>
-          </div>
-          <div class="provider-stat">
-            <span class="provider-stat-label">{t('Credit', '额度')}</span>
-            <span class="provider-stat-value">{pp.credit} / {pp.creditLimit}</span>
-          </div>
+        <div class="provider-stats-grid">
+          {#if pp.plan.includes('Plan')}
+            <!-- Token Plan card -->
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Status', '状态')}</span>
+              <span class="provider-stat-value status-connected">{t('connected', 'connected')}</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Plan', '套餐')}</span>
+              <span class="provider-stat-value">{pp.plan}</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Consumed', '已消耗')}</span>
+              <span class="provider-stat-value">{formatNum(pp.requests * 1000)} {t('tokens', 'tokens')}</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Limit', '限额')}</span>
+              <span class="provider-stat-value">{pp.creditLimit}</span>
+            </div>
+          {:else}
+            <!-- Usage Details card -->
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Status', '状态')}</span>
+              <span class="provider-stat-value status-connected">{t('connected', 'connected')}</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Cumulative', '累计消费')}</span>
+              <span class="provider-stat-value">{pp.cost}</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Token History', 'token历史消耗')}</span>
+              <span class="provider-stat-value">{formatNum(pp.requests * 1000)} {t('tokens', 'tokens')}</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Input (Cache Hit)', '输入(命中缓存)')}</span>
+              <span class="provider-stat-value">{pp.creditLimit}</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Input (Cache Miss)', '输入(未命中缓存)')}</span>
+              <span class="provider-stat-value">—</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Output', '输出')}</span>
+              <span class="provider-stat-value">—</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Plugin Calls', '插件服务成功调用次数')}</span>
+              <span class="provider-stat-value">—</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Search Calls', '搜索服务成功调用次数')}</span>
+              <span class="provider-stat-value">—</span>
+            </div>
+            <div class="provider-stat">
+              <span class="provider-stat-label">{t('Total Cost', '总体消费金额')}</span>
+              <span class="provider-stat-value">—</span>
+            </div>
+          {/if}
         </div>
       </div>
     {/each}
@@ -388,7 +503,7 @@
 
   /* Provider Cards */
   .provider-cards-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 28px; }
-  .provider-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; transition: all 200ms; }
+  .provider-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; transition: all 200ms; font-family: 'SimSun', '宋体', 'Songti SC', serif; }
   .provider-card:hover { border-color: #d1d5db; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
   .provider-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
   .provider-logo { font-size: 28px; }
@@ -405,9 +520,14 @@
   .delete-cancel-btn { padding: 8px 16px; border: 1px solid #e5e7eb; background: #ffffff; color: #374151; font-size: 13px; font-weight: 500; border-radius: 10px; cursor: pointer; transition: all 150ms; }
   .delete-cancel-btn:hover { background: #f9fafb; border-color: #d1d5db; }
   .provider-stats { display: flex; gap: 24px; }
-  .provider-stat { display: flex; flex-direction: column; gap: 2px; }
-  .provider-stat-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
-  .provider-stat-value { font-size: 16px; font-weight: 600; color: #111827; font-family: 'SF Mono', monospace; }
+  .provider-stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;
+  }
+  .provider-stat { display: flex; flex-direction: column; gap: 4px; }
+  .provider-stat-label { font-size: 13px; color: #6b7280; font-weight: 600; }
+  .provider-stat-value { font-size: 16px; font-weight: 700; color: #111827; font-family: 'SF Mono', monospace; }
+  .status-connected { color: #10b981; }
 
   /* Add Plan Card */
   .add-plan-card {

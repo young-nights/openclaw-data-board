@@ -1667,6 +1667,18 @@ export function startUiServer(port: number, toolClient: ToolClient): Server {
         });
       }
 
+      if (method === "POST" && path === "/api/subscription/save") {
+        assertAllowedQueryParams(url.searchParams, [], true);
+        const body = await readJsonBody(req);
+        if (!body || !body.subscription) {
+          return writeJson(res, 400, { ok: false, error: "Missing subscription data" });
+        }
+        const snapshotPath = join(process.cwd(), "runtime", "subscription-snapshot.json");
+        await mkdir(join(process.cwd(), "runtime"), { recursive: true });
+        await writeFile(snapshotPath, JSON.stringify(body, null, 2), "utf-8");
+        return writeJson(res, 200, { ok: true, path: snapshotPath });
+      }
+
       if (method === "GET" && path === "/api/tasks/heartbeat") {
         assertAllowedQueryParams(url.searchParams, ["limit"], true);
         const limit = readPositiveIntQuery(url.searchParams.get("limit"), "limit", 20, true, 200);

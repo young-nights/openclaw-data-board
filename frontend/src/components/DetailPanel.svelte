@@ -2,11 +2,13 @@
 <script lang="ts">
   import type { UiLanguage } from '../types';
 
-  let { viewType, language, timeRange, onClose }: {
+  let { viewType, language, timeRange, onClose, chartData = [], tableData = [] }: {
     viewType: 'spend' | 'requests' | 'tokens';
     language: UiLanguage;
     timeRange: string;
     onClose: () => void;
+    chartData?: number[];
+    tableData?: Array<{ model: string; color: string; min: number; max: number; avg: number; sum: number }>;
   } = $props();
 
   let sortKey = $state<string>('sum');
@@ -75,24 +77,13 @@
   }
 
   const models = $derived({
-    spend: [
-      { name: 'MiMo-V2-Pro', color: '#f5a623', data: genDaily(1, 67, Math.floor(barCount * 0.8)) },
-      { name: 'DeepSeek V3', color: '#3ecf8e', data: genDaily(0.5, 5, Math.floor(barCount * 0.8)) },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: dayLabels.map(() => 0) },
-    ],
-    requests: [
-      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(80, 2300, Math.floor(barCount * 0.8)) },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(15, 85, Math.floor(barCount * 0.8)) },
-      { name: 'DeepSeek V3', color: '#f5a623', data: dayLabels.map(() => Math.round(Math.random() * 2)) },
-    ],
-    tokens: [
-      { name: 'MiMo-V2-Pro', color: '#00d4aa', data: genDaily(5000000, 120000000, Math.floor(barCount * 0.8)) },
-      { name: 'MiMo-V2-Omni', color: '#7c9aff', data: genDaily(800000, 5000000, Math.floor(barCount * 0.8)) },
-      { name: 'DeepSeek V3', color: '#f5a623', data: dayLabels.map(() => Math.round(Math.random() * 5000)) },
-    ],
+    spend: [] as Array<{ name: string; color: string; data: number[] }>,
+    requests: [] as Array<{ name: string; color: string; data: number[] }>,
+    tokens: [] as Array<{ name: string; color: string; data: number[] }>,
   });
 
   const currentModels = $derived(models[viewType]);
+  const currentTableData = $derived(tableData);
 
   const maxStacked = $derived(
     Math.max(...dayLabels.map((_, i) =>
@@ -126,12 +117,9 @@
 
   const currentYLabels = $derived(yLabelsFromMax(yMax));
 
-  // Table data
-  let tableData = $state([
-    { model: 'MiMo-V2-Pro', color: '#f5a623', min: 0, max: 2300, avg: 603, sum: 6030 },
-    { model: 'MiMo-V2-Omni', color: '#7c9aff', min: 16, max: 218, avg: 84.5, sum: 507 },
-    { model: 'DeepSeek V3', color: '#3ecf8e', min: 2, max: 2, avg: 2, sum: 2 },
-  ]);
+  // Table data - use prop or internal state
+  let internalTableData = $state<Array<{ model: string; color: string; min: number; max: number; avg: number; sum: number }>>([]);
+  const displayTableData = $derived(tableData.length > 0 ? tableData : internalTableData);
 
   function handleSort(key: string) {
     if (sortKey === key) sortAsc = !sortAsc;
@@ -265,7 +253,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each tableData as row}
+          {#each displayTableData as row}
             <tr>
               <td class="model-cell">
                 <span class="model-dot" style="background: {row.color}"></span>

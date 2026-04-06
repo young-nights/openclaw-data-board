@@ -21,7 +21,7 @@
   let expandedSection = $state<'models' | 'keys' | null>(null);
   let modelSearch = $state('');
   let keySearch = $state('');
-  let selectedModels = $state<Set<string>>(new Set(['MiMo-V2-Pro', 'DeepSeek V3', 'MiMo-V2-Omni']));
+  let selectedModels = $state<Set<string>>(new Set());
   let selectedKeys = $state<Set<string>>(new Set(['All API Keys']));
 
   const timeRanges = [
@@ -33,16 +33,9 @@
   ];
 
   // Dynamic model data
-  const allModels = [
-    { name: 'MiMo-V2-Pro', color: '#f5a623', spend: 0.0679, requests: 6030, tokens: 608000000 },
-    { name: 'DeepSeek V3', color: '#3ecf8e', spend: 0.00552, requests: 2, tokens: 11000 },
-    { name: 'MiMo-V2-Omni', color: '#7c9aff', spend: 0, requests: 507, tokens: 25200000 },
-  ];
+  const allModels: Array<{ name: string; color: string; spend: number; requests: number; tokens: number }> = [];
 
-  const allKeys = [
-    { name: 'openclaw-desktop', key: 'sk-...a1b2', requests: 4520 },
-    { name: 'openclaw-server', key: 'sk-...c3d4', requests: 2017 },
-  ];
+  const allKeys: Array<{ name: string; key: string; requests: number }> = [];
 
   const filteredModels = $derived(
     allModels.filter(m => m.name.toLowerCase().includes(modelSearch.toLowerCase()))
@@ -82,9 +75,12 @@
     return String(n);
   }
 
-  const spendModels = $derived(allModels.filter(m => m.spend > 0 && selectedModels.has(m.name)).map(m => ({ name: m.name, value: formatNum(m.spend), color: m.color })));
-  const requestsModels = $derived(allModels.filter(m => m.requests > 0 && selectedModels.has(m.name)).map(m => ({ name: m.name, value: formatNum(m.requests), color: m.color })));
-  const tokensModels = $derived(allModels.filter(m => m.tokens > 0 && selectedModels.has(m.name)).map(m => ({ name: m.name, value: formatNum(m.tokens), color: m.color })));
+  const spendModels = $derived([] as Array<{name: string; value: string; color: string}>);
+  const requestsModels = $derived([] as Array<{name: string; value: string; color: string}>);
+  const tokensModels = $derived([] as Array<{name: string; value: string; color: string}>);
+  
+  // Table data for detail panel
+  const tableData = $derived([] as Array<{ model: string; color: string; min: number; max: number; avg: number; sum: number }>);
 
   function genMiniData(spike: number, spikeIdx: number, points: number): number[] {
     return Array.from({ length: points }, (_, i) => {
@@ -105,16 +101,23 @@
   }
 
   const pointCount = $derived(getPointCount(timeRange));
-  const hasData = $derived(timeRange !== '1h');
+  const hasData = $derived(false);
 
-  const spendChartData = $derived(hasData ? genMiniData(8, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
-  const requestsChartData = $derived(hasData ? genMiniData(350, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
-  const tokensChartData = $derived(hasData ? genMiniData(65000, Math.floor(pointCount * 0.7), pointCount) : Array(pointCount).fill(0));
+  const spendChartData = $derived(Array(pointCount).fill(0));
+  const requestsChartData = $derived(Array(pointCount).fill(0));
+  const tokensChartData = $derived(Array(pointCount).fill(0));
 
   function handleRefresh() { lastUpdated = new Date(); }
   function formatTime(date: Date): string {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
+  // Get chart data for current view
+  const currentChartData = $derived(
+    detailView === 'spend' ? spendChartData :
+    detailView === 'requests' ? requestsChartData :
+    detailView === 'tokens' ? tokensChartData : []
+  );
+
   function openDetail(view: 'spend' | 'requests' | 'tokens') {
     detailView = detailView === view ? null : view;
   }
@@ -218,11 +221,11 @@
 
   <!-- Three Metric Cards -->
   <div class="metrics-row">
-    <MetricCard title="Spend" value="$0.0735" subtitle="" color="spend" icon="💰"
+    <MetricCard title="Spend" value="$0.0000" subtitle="" color="spend" icon="💰"
       chartData={spendChartData} modelBreakdown={spendModels} onClick={() => openDetail('spend')} />
-    <MetricCard title="Requests" value="7K" subtitle="" color="requests" icon="📊"
+    <MetricCard title="Requests" value="0" subtitle="" color="requests" icon="📊"
       chartData={requestsChartData} modelBreakdown={requestsModels} onClick={() => openDetail('requests')} />
-    <MetricCard title="Tokens" value="633M" subtitle="" color="tokens" icon="🔢"
+    <MetricCard title="Tokens" value="0" subtitle="" color="tokens" icon="🔢"
       chartData={tokensChartData} modelBreakdown={tokensModels} onClick={() => openDetail('tokens')} />
   </div>
 
@@ -232,7 +235,7 @@
   {#if detailView}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="detail-overlay" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('detail-overlay')) detailView = null; }}>
-      <DetailPanel viewType={detailView} {language} {timeRange} onClose={() => detailView = null} />
+      <DetailPanel viewType={detailView} {language} {timeRange} onClose={() => detailView = null} chartData={currentChartData} tableData={tableData} />
     </div>
   {/if}
 
